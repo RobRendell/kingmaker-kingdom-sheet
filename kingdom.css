@@ -1,0 +1,247 @@
+
+#menu
+{
+    float: right;
+    color: blue;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+#menuDiv
+{
+    display: none;
+    z-index: 5;
+    position: absolute;
+    right: 5px;
+    top: 2em;
+    border: 1px solid black;
+    background-color: white;
+    padding: 1em;
+}
+
+#importExportDiv
+{
+    display: none;
+    z-index: 10;
+    width: 100%;
+    height: 100%;
+    background-color: white;
+    position: fixed;
+}
+
+#importExportDiv textarea
+{
+    margin: 2em;
+    width: 90%;
+    height: 70%;
+}
+
+h1
+{
+    font-size: 18pt;
+}
+
+h2
+{
+    font-size: 14pt;
+}
+
+
+table
+{
+    border-collapse: collapse;
+}
+
+.blue
+{
+    text-align: left;
+    margin: 20px;
+}
+
+.blue td
+{
+    text-align: center;
+    background: #E8EDFF;
+    border-bottom: 1px solid white;
+    color: #669;
+    border-top: 1px solid transparent;
+    padding: 8px;
+}
+
+.blue th
+{
+    font-size: 13px;
+    font-weight: normal;
+    background: #B9C9FE;
+    border-top: 4px solid #AABCFE;
+    border-bottom: 1px solid white;
+    color: #039;
+    padding: 8px;
+}
+
+.leaders th
+{
+    text-align: center;
+}
+
+.notVacant
+{
+    opacity: 0.5;
+}
+
+.summary
+{
+    display: inline-block;
+}
+
+.edicts
+{
+    display: inline-block;
+    margin-left: 30px;
+}
+
+.expando
+{
+    cursor: pointer;
+}
+
+#addPersonButton
+{
+    margin-left: 20px;
+}
+
+.buildingSite
+{
+    background-color: orange;
+}
+
+img.buildingSite
+{
+    opacity: 0.5;
+}
+
+#buildSelect
+{
+    position: absolute;
+    display: none;
+    background-color: white;
+    z-index: 5;
+    padding: 5px;
+    padding-left: 10px;
+    border: 1px solid black;
+}
+
+.twoColumn
+{
+    column-count: 2;
+    -moz-column-count: 2;
+    -webkit-column-count: 2;
+    column-gap: 50px;
+    -moz-column-gap: 50px;
+    -webkit-column-gap: 50px;
+    column-rule: 1px solid black;
+    -moz-column-rule: 1px solid black;
+    -webkit-column-rule: 1px solid black;
+}
+
+.noWrap *
+{
+    white-space: nowrap;
+}
+
+.city
+{
+    border: 12px solid white;
+}
+
+.city td
+{
+    border-spacing: 0;
+    padding: 0;
+}
+
+.cityDistrict
+{
+    display: inline-block;
+    position: relative;
+    height: 552px;
+    width: 552px;
+    background-color: tan;
+    border: 12px solid tan;
+}
+
+.cityDistrict .square
+{
+    border: 1px dotted black;
+    width: 72px;
+    height: 72px;
+    position: absolute;
+}
+
+.cityDistrict .square:hover
+{
+    border: 1px solid black;
+}
+
+.cityDistrict .border
+{
+    border: 1px dotted black;
+    position: absolute;
+}
+
+.cityDistrict .border:hover
+{
+    border: 1px solid black;
+}
+
+.cityDistrict .top
+{
+    width: 600px;
+    height: 24px;
+    top: -25px;
+    left: -25px;
+}
+
+.cityDistrict .bottom
+{
+    width: 600px;
+    height: 24px;
+    left: -25px;
+    bottom: -25px;
+}
+
+.cityDistrict .left
+{
+    width: 24px;
+    height: 600px;
+    top: -25px;
+    left: -25px;
+}
+
+.cityDistrict .right
+{
+    width: 24px;
+    height: 600px;
+    top: -25px;
+    right: -25px;
+}
+
+.cityDistrict img
+{
+    position: absolute;
+}
+
+.problem
+{
+    color: red;
+}
+
+.resources th:first-child
+{
+    width: 30em;
+}
+
+.resources td:first-child
+{
+    text-align: left;
+}
