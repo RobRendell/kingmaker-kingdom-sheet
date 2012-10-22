@@ -156,6 +156,8 @@ $.kingdom.KingdomManager = Class.create(
 	this.data = new $.kingdom.Choices('', 'kingdomManager');
 	this.currentName = this.data.get('currentName');
 	this.nameList = this.data.getArray('nameList');
+	if (this.nameList.length == 0)
+	    this.nameList = [''];
 	this.current = new $.kingdom.Kingdom(this, this.currentName);
 	this.setupMenus();
     },
@@ -189,6 +191,11 @@ $.kingdom.KingdomManager = Class.create(
 	this.updateNameList(this.currentName);
     },
 
+    nameUsed: function (name)
+    {
+	return (this.nameList.indexOf(name) >= 0);
+    },
+
     openMenu: function (evt)
     {
 	var kingdomList = $('#kingdomList');
@@ -202,7 +209,7 @@ $.kingdom.KingdomManager = Class.create(
 		this.switchKingdom(name);
 	    }, this));
 	    if (name.length == 0)
-		link.attr('href', '#').text(this.current.emptyNameString);
+		link.attr('href', '#').text('Unnamed kingdom');
 	    else
 		link.attr('href', '#').text(name);
 	    kingdomList.append(link);
@@ -235,7 +242,7 @@ $.kingdom.KingdomManager = Class.create(
 
     newKingdom: function ()
     {
-	if (this.current.choices.nameUsed(''))
+	if (this.nameUsed(''))
 	    alert('There is already an unnamed kingdom');
 	else
 	    this.switchKingdom('');
@@ -247,6 +254,18 @@ $.kingdom.KingdomManager = Class.create(
 	if (index >= 0)
 	    this.nameList.splice(index, 1);
 	this.setCurrent(this.current);
+    },
+
+    deleteCurrentKingdom: function ()
+    {
+	var index = this.nameList.indexOf(this.currentName);
+	if (index >= 0)
+	    this.nameList.splice(index, 1);
+	this.data.set('nameList', this.nameList);
+	if (this.nameList.length > 0)
+	    this.switchKingdom(this.nameList[0]);
+	else
+	    this.newKingdom();
     },
 
     openImportExport: function ()
@@ -334,7 +353,7 @@ $.kingdom.Choices = Class.create(
 	return value;
     },
 
-    getKeys: function (full)
+    getKeys: function ()
     {
 	if (this.isLocalStorage)
 	{
@@ -342,9 +361,7 @@ $.kingdom.Choices = Class.create(
 	    for (var index = 0; index < this.data.length; ++index)
 	    {
 		var key = this.data.key(index);
-		if (full)
-		    result.push(key);
-		else if (key.indexOf(this.prefix) == 0)
+		if (key.indexOf(this.prefix) == 0)
 		{
 		    key = key.substring(this.prefix.length);
 		    result.push(key);
@@ -373,31 +390,22 @@ $.kingdom.Choices = Class.create(
 	}, this));
     },
 
-    nameUsed: function (name)
-    {
-	var result = false;
-	var key = this.basePrefix + name + '.';
-	var keys = this.getKeys(true);
-	$.each(keys, $.proxy(function (index, fullKey)
-	{
-	    if (fullKey.indexOf(key) == 0)
-	    {
-		result = true;
-		return true;
-	    }
-	}, this));
-	return result;
-    },
-
     setName: function (name)
     {
 	name = name || '';
-	var oldPrefix = this.name + '.';
-	var newPrefix = name + '.';
+	var oldPrefix = this.name.toId() + '.';
+	var newPrefix = name.toId() + '.';
 	this.prefix = this.basePrefix;
 	this.changeId(oldPrefix, newPrefix, false);
 	this.name = name;
 	this.prefix = this.basePrefix + this.name + '.';
+    },
+
+    removeName: function ()
+    {
+	var oldPrefix = this.name.toId() + '.';
+	this.prefix = this.basePrefix;
+	this.changeId(oldPrefix, '', true);
     }
 
 });
@@ -572,23 +580,28 @@ $.kingdom.Kingdom = Class.create(
 	    oldValue = '';
 	if (newValue == this.emptyNameString)
 	    newValue = '';
-	if (newValue == oldValue)
-	    ;
-	else if (this.choices.nameUsed(newValue))
+	if (!newValue && oldValue)
 	{
-	    if (newValue)
-		alert('There is already a kingdom named ' + newValue);
-	    else
-		alert('There is already an unnamed kingdom');
-	    $('#kingdomName').text(oldValue || this.emptyNameString);
+	    var answer = confirm("Really delete " + oldValue + "?");
+	    if (!answer)
+	    {
+		element.text(oldValue);
+		return;
+	    }
+	    this.choices.removeName();
+	    this.kingdomManager.deleteCurrentKingdom();
+	    return;
 	}
-	else
+	else if (newValue && newValue != oldValue && this.kingdomManager.nameUsed(newValue))
 	{
-	    this.choices.setName(newValue.toId());
-	    this.name = newValue;
-	    $('#kingdomName').text(newValue || this.emptyNameString);
-	    this.kingdomManager.currentKingdomNameChanged(newValue);
+	    alert('There is already a kingdom named ' + newValue);
+	    element.text(oldValue || this.emptyNameString);
+	    return;
 	}
+	element.text(newValue || this.emptyNameString);
+	this.choices.setName(newValue.toId());
+	this.name = newValue;
+	this.kingdomManager.currentKingdomNameChanged(newValue);
     },
 
     setChoice: function (field, value)
@@ -1185,7 +1198,7 @@ $.kingdom.Leader = Class.create(
     {
 	var oldName = this.peopleSelect.val();
 	var newName = this.person ? this.person.name : '';
-	if (oldName != newName)
+	if (oldName && newName && oldName != newName)
 	{
 	    this.peopleSelect.setSelect(idlePeople, true, newName);
 	    this.kingdom.setChoice(this.getId('name'), newName);
