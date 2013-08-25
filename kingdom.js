@@ -1473,7 +1473,7 @@ $.kingdom.Building = Class.create(
 	    'cost': 10,
 	    'adjacentHouses': 1,
 	    'minorItems': 1,
-	    'Loyalty': 1,
+	    'Economy': 1,
 	    'Stability': 1
 	},
 	'Garrison': {
