@@ -1395,7 +1395,7 @@ $.kingdom.Building = Class.create(
 	},
 	'Barracks': {
 	    'size': '1x1',
-	    'cost': 12,
+	    'cost': 6,
 	    'Defense': 2,
 	    'Unrest': -1
 	},
@@ -1699,7 +1699,7 @@ $.kingdom.Building = Class.create(
 	},
 	'Watchtower': {
 	    'size': '1x1',
-	    'cost': 6,
+	    'cost': 12,
 	    'Stability': 1,
 	    'Defense': 2,
 	    'Unrest': -1
