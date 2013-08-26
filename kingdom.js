@@ -743,7 +743,7 @@ $.kingdom.Kingdom = Class.create(
     {
 	this.recalculateCallout = null;
 
-	console.info("recalculating...");
+	// console.info("recalculating...");
 	this.reset();
 
 	// cities
