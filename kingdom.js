@@ -1854,6 +1854,28 @@ $.kingdom.Building.eachBuilding = function (callback)
     });
 };
 
+// ====================== Ruin class ======================
+
+$.kingdom.Ruin = Class.create(
+{
+
+    init: function (building)
+    {
+	this.building = building;
+	this.image = building.image;
+    },
+
+    apply: function (city)
+    {
+    },
+
+    toString: function ()
+    {
+	return 'Ruined ' + this.building.name;
+    }
+
+});
+
 // ====================== District class ======================
 
 $.kingdom.District = Class.create(
@@ -1883,7 +1905,10 @@ $.kingdom.District = Class.create(
 		var name = $.trim(pair[1]);
 		if (name == 'continue')
 		    this.buildings[index] = this.bigBuilding;
-		else
+		else if (name.indexOf('*') == 0) {
+		    var actual = name.substring(1);
+		    this.buildings[index] = new $.kingdom.Ruin($.kingdom.Building.get(actual));
+		} else
 		    this.buildings[index] = $.kingdom.Building.get(name);
 	    }, this));
 	}
@@ -1913,6 +1938,8 @@ $.kingdom.District = Class.create(
 		    text += index;
 		if (building == this.bigBuilding)
 		    text += ":continue";
+		else if (building instanceof $.kingdom.Ruin)
+		    text += ":*" + building.building.name;
 		else
 		    text += ":" + building.name;
 	    }
@@ -1980,6 +2007,9 @@ $.kingdom.District = Class.create(
 		    x -= 36;
 		    y += 41;
 		}
+	    }
+	    if (building instanceof $.kingdom.Ruin) {
+		square.addClass('ruin');
 	    }
 	}
 	else
@@ -2147,6 +2177,24 @@ $.kingdom.District = Class.create(
 	this.save();
 	this.city.render();
 	return building;
+    },
+
+    ruinBuilding: function(index)
+    {
+	var building = this.buildings[index];
+	this.buildings[index] = new $.kingdom.Ruin(building);
+	this.save();
+	this.city.render();
+    },
+
+    repairBuilding: function(index)
+    {
+	var ruin = this.buildings[index];
+	var cost = parseInt(this.buildingCost(ruin.building)/2);
+	this.city.kingdom.spendTreasury(cost);
+	this.buildings[index] = ruin.building;
+	this.save();
+	this.city.render();
     },
 
     /*
@@ -2747,6 +2795,16 @@ $.kingdom.CityBuilder = Class.create(
 	this.finishMenu();
     },
 
+    ruin: function ()
+    {
+	this.district.ruinBuilding(this.index);
+    },
+
+    repair: function ()
+    {
+	this.district.repairBuilding(this.index);
+    },
+
     demolish: function ()
     {
 	this.district.clearBuilding(this.index);
@@ -2780,21 +2838,31 @@ $.kingdom.CityBuilder = Class.create(
     selectBuilding: function (evt)
     {
 	this.openMenu(evt);
-	if (this.district.canDemolish(this.index))
-	    this.addToMenu('Demolish building', this.demolish);
 	var currBuilding = this.district.buildings[this.index];
-	if (currBuilding.upgradeTo)
-	    this.addBuildingToMenu(currBuilding.upgradeTo, 'Upgrade to ' + currBuilding.upgradeTo.name, this.upgrade);
-	if (currBuilding.size == '2x1')
-	{
-	    if (this.district.move2x1ToEdge(this.index, 0, false))
-		this.addToMenu('Move building to north edge', this.moveToNorth);
-	    if (this.district.move2x1ToEdge(this.index, 2, false))
-		this.addToMenu('Move building to south edge', this.moveToSouth);
-	    if (this.district.move2x1ToEdge(this.index, 1, false))
-		this.addToMenu('Move building to east edge', this.moveToEast);
-	    if (this.district.move2x1ToEdge(this.index, 3, false))
-		this.addToMenu('Move building to west edge', this.moveToWest);
+	if (currBuilding instanceof $.kingdom.Ruin) {
+	    var cost = parseInt(this.district.buildingCost(currBuilding.building)/2);
+	    var treasury = this.kingdom.getTreasury();
+	    if (cost > treasury)
+		this.addToMenu('Repair ruin &mdash; too expensive (' + cost + ' BP)');
+	    else
+		this.addToMenu('Repair ruin &mdash; ' + cost + ' BP', this.repair);
+	} else {
+	    this.addToMenu('Ruin building', this.ruin);
+	    if (this.district.canDemolish(this.index))
+		this.addToMenu('Demolish building', this.demolish);
+	    if (currBuilding.upgradeTo)
+		this.addBuildingToMenu(currBuilding.upgradeTo, 'Upgrade to ' + currBuilding.upgradeTo.name, this.upgrade);
+	    if (currBuilding.size == '2x1')
+	    {
+		if (this.district.move2x1ToEdge(this.index, 0, false))
+		    this.addToMenu('Move building to north edge', this.moveToNorth);
+		if (this.district.move2x1ToEdge(this.index, 2, false))
+		    this.addToMenu('Move building to south edge', this.moveToSouth);
+		if (this.district.move2x1ToEdge(this.index, 1, false))
+		    this.addToMenu('Move building to east edge', this.moveToEast);
+		if (this.district.move2x1ToEdge(this.index, 3, false))
+		    this.addToMenu('Move building to west edge', this.moveToWest);
+	    }
 	}
 	this.finishMenu();
     },
