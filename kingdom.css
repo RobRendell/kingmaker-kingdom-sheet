@@ -1,14 +1,12 @@
 
-#menu
-{
+#menu {
     float: right;
     color: blue;
     text-decoration: underline;
     cursor: pointer;
 }
 
-#menuDiv
-{
+#menuDiv {
     display: none;
     z-index: 5;
     position: absolute;
@@ -19,53 +17,43 @@
     padding: 1em;
 }
 
-#importExportDiv
-{
+.hiddenPanel {
     display: none;
     z-index: 10;
     width: 100%;
     height: 100%;
     background-color: white;
-    position: fixed;
+    position: absolute;
 }
 
-#importExportDiv textarea
-{
+#importExportDiv textarea {
     margin: 2em;
     width: 90%;
     height: 70%;
 }
 
-.calendar
-{
+.calendar {
     float: right;
     margin-right: 30%;
 }
 
-h1
-{
+h1 {
     font-size: 18pt;
 }
 
-h2
-{
+h2 {
     font-size: 14pt;
 }
 
-
-table
-{
+table {
     border-collapse: collapse;
 }
 
-.blue
-{
-    text-align: left;
+.blue { text-align: left;
     margin: 20px;
 }
 
-.blue td
-{
+.blue td {
     text-align: center;
     background: #E8EDFF;
     border-bottom: 1px solid white;
@@ -74,8 +62,7 @@ table
     padding: 8px;
 }
 
-.blue th
-{
+.blue th {
     font-size: 13px;
     font-weight: normal;
     background: #B9C9FE;
@@ -85,49 +72,40 @@ table
     padding: 8px;
 }
 
-.leaders th
-{
+.leaders th {
     text-align: center;
 }
 
-.notVacant
-{
+.notVacant {
     opacity: 0.5;
 }
 
-.summary
-{
+.summary {
     display: inline-block;
 }
 
-.edicts
-{
+.edicts {
     display: inline-block;
     margin-left: 30px;
 }
 
-.expando
-{
+.expando {
     cursor: pointer;
 }
 
-#addPersonButton
-{
+#addPersonButton {
     margin-left: 20px;
 }
 
-.buildingSite
-{
+.buildingSite {
     background-color: orange;
 }
 
-img.buildingSite
-{
+img.buildingSite {
     opacity: 0.5;
 }
 
-#buildSelect
-{
+#buildSelect {
     position: absolute;
     display: none;
     background-color: white;
@@ -137,8 +115,7 @@ img.buildingSite
     border: 1px solid black;
 }
 
-.twoColumn
-{
+.twoColumn {
     column-count: 2;
     -moz-column-count: 2;
     -webkit-column-count: 2;
@@ -150,18 +127,15 @@ img.buildingSite
     -webkit-column-rule: 1px solid black;
 }
 
-.noWrap *
-{
+.noWrap * {
     white-space: nowrap;
 }
 
-.city
-{
+.city {
     border: 12px solid white;
 }
 
-.city td
-{
+.city td {
     border-spacing: 0;
     padding: 0;
 }
@@ -191,8 +165,11 @@ img.buildingSite
     color: red;
 }
 
-.cityDistrict
-{
+.settlementStats {
+    margin-left: 3em;
+}
+
+.cityDistrict {
     display: inline-block;
     position: relative;
     height: 552px;
@@ -201,84 +178,86 @@ img.buildingSite
     border: 12px solid tan;
 }
 
-.cityDistrict .square
-{
+.cityDistrict .emptyLot {
     border: 1px dotted black;
     width: 72px;
     height: 72px;
     position: absolute;
 }
 
-.cityDistrict .square:hover
-{
+.cityDistrict .emptyLot:hover {
     border: 1px solid black;
 }
 
-.cityDistrict .border
-{
+.cityDistrict .border {
     border: 1px dotted black;
     position: absolute;
 }
 
-.cityDistrict .border:hover
-{
+.cityDistrict .border:hover {
     border: 1px solid black;
 }
 
-.cityDistrict .top
-{
+.cityDistrict .top {
     width: 600px;
     height: 24px;
     top: -25px;
     left: -25px;
 }
 
-.cityDistrict .bottom
-{
+.cityDistrict .bottom {
     width: 600px;
     height: 24px;
     left: -25px;
     bottom: -25px;
 }
 
-.cityDistrict .left
-{
+.cityDistrict .left {
     width: 24px;
     height: 600px;
     top: -25px;
     left: -25px;
 }
 
-.cityDistrict .right
-{
+.cityDistrict .right {
     width: 24px;
     height: 600px;
     top: -25px;
     right: -25px;
 }
 
-.cityDistrict img
-{
+.cityDistrict img {
     position: absolute;
 }
 
-.problem
-{
+.cityDistrict .size1x1 {
+    width: 72px;
+    height: 72px;
+}
+
+.cityDistrict .size2x1 {
+    width: 154px;
+    height: 72px;
+}
+
+.cityDistrict .size2x2 {
+    width: 154px;
+    height: 154px;
+}
+
+.problem {
     color: red;
 }
 
-.resources th:first-child
-{
+.resources th:first-child {
     width: 30em;
 }
 
-.resources td:first-child
-{
+.resources td:first-child {
     text-align: left;
 }
 
-.ruin
-{
+.ruin {
     filter: url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'grayscale\'><feColorMatrix type=\'matrix\' values=\'0.3333 0.3333 0.3333 0 0 0.3333 0.3333 0.3333 0 0 0.3333 0.3333 0.3333 0 0 0 0 0 1 0\'/></filter></svg>#grayscale");	/* Firefox 3.5+ */
     filter: gray; /* IE6-9 */
     -webkit-filter: grayscale(100%); /* Chrome 19+ and Safari 6+ */

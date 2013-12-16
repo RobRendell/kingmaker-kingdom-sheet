@@ -13,9 +13,10 @@
 	<div id="kingdomList"></div>
 	<hr/>
 	<a href="#" id="menuNewKingdom">Create New Kingdom</a><br/>
-	<a href="#" id="menuImportExport">Import/Export Kingdom</a>
+	<a href="#" id="menuImportExport">Import/Export Kingdom</a><br/>
+	<a href="#" id="menuHouseRules">Configure Kingdom Rules</a>
     </div>
-    <div id="importExportDiv">
+    <div class="hiddenPanel" id="importExportDiv">
 	<p>Copy and paste into and out of this text area to export the current kingdom or import a new or existing kingdom</p>
 	<textarea name="importExportArea">
 	</textarea><br/>
@@ -24,6 +25,24 @@
     </div>
 
     <span class="calendar"><span id="calendar">Calendar</span><button id="calendarMinus">-</button><button id="calendarPlus">+</button></span>
+
+    <div class="hiddenPanel" id="houseRulesDiv">
+	<h3>Configure the house rules that apply to this kingdom</h3>
+	<p>Which base ruleset does this kingdom use?
+	    <select id="hrRuleset">
+		<option value="RRR">Rivers Run Red</option>
+		<option value="UC">Ultimate Campaign</option>
+	    </select>
+	</p>
+	<div id="hrRRROnly">
+	    <p><label><input type="checkbox" id="hrMansionVilla"> Mansions and Noble Villas are considered houses.</label></p>
+	</div>
+	<div id="hrUCOnly">
+	</div>
+	<p><label><input type="checkbox" id="hrCalculateEconomyBoost"> Magic item slots simply boost Economy instead of filling with items that you roll to sell each turn.</label></p>
+	<p><label><input type="checkbox" id="hrCalculatePrice"> Building prices are calculated from their features.</label></p>
+	<button id="houseRulesClose">Close</button>
+    </div>
 
     <h1><span id="kingdomType">Barony</span> of <span id="kingdomName"></span><h1>
 
