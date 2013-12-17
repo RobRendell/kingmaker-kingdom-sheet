@@ -495,6 +495,7 @@ $.kingdom.Kingdom = Class.create(
 	this.setupExpandos();
 	// Initial calculate
 	this.scheduleRecalculate();
+	this.calendar = new $.kingdom.Calendar(this);
     },
 
     reset: function ()
@@ -634,9 +635,12 @@ $.kingdom.Kingdom = Class.create(
 	    return this.choices.get(field);
     },
 
-    getArrayChoice: function (field)
+    getArrayChoice: function (field, defaultValue)
     {
-	return this.choices.getArray(field);
+	if (this.choices.get(field) == undefined)
+	    return defaultValue || [];
+	else
+	    return this.choices.getArray(field);
     },
 
     changeId: function (oldId, newId, remove)
@@ -3086,6 +3090,58 @@ $.kingdom.ResourceTable = Class.create(
 	{
 	    resource.apply();
 	}, this));
+    }
+
+});
+
+// ====================== Calendar class ======================
+
+$.kingdom.Calendar = Class.create(
+{
+    init: function (kingdom) {
+	this.kingdom = kingdom;
+	this.year = this.kingdom.getChoice('calendarYear', 4712);
+	this.month = this.kingdom.getChoice('calendarMonth', 2);
+	this.monthNames = this.kingdom.getArrayChoice('monthNames', [ 'Abadius', 'Calistril', 'Pharast', 'Gozran', 'Desnus', 'Sarenith', 'Erastus', 'Arodus', 'Rova', 'Lamashan', 'Neth', 'Kuthona' ]);
+	this.seasons = this.kingdom.getArrayChoice('seasons', [ 'Winter 2', 'Winter 3', 'Spring 1', 'Spring 2', 'Spring 3', 'Summer 1', 'Summer 2', 'Summer 3', 'Autumn 1', 'Autumn 2', 'Autumn 3', 'Winter 1' ]);
+	$('#calendarMinus').click($.proxy(this.minus, this));
+	$('#calendarPlus').click($.proxy(this.plus, this));
+	this.refresh();
+    },
+
+    refresh: function () {
+	$('#calendar').text(this.toString());
+    },
+
+    toString: function () {
+	return this.monthNames[this.month] + ' ' + this.year + ' (' + this.seasons[this.month] + ')';
+    },
+
+    minus: function () {
+	this.month--;
+	if (this.month < 0) {
+	    this.year--;
+	    this.month = this.monthNames.length;
+	}
+	this.save();
+	this.refresh();
+    },
+
+    plus: function () {
+	this.month++;
+	if (this.month >= this.monthNames.length) {
+	    this.year++;
+	    this.month = 0;
+	}
+	this.save();
+	this.refresh();
+    },
+
+    save: function () {
+	this.kingdom.setChoice('calendarYear', this.year);
+	this.kingdom.setChoice('calendarMonth', this.month);
+	this.kingdom.setChoice('monthNames', this.monthNames);
+	this.kingdom.setChoice('seasons', this.seasons);
     }
 
 });

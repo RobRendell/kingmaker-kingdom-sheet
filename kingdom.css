@@ -36,6 +36,12 @@
     height: 70%;
 }
 
+.calendar
+{
+    float: right;
+    margin-right: 30%;
+}
+
 h1
 {
     font-size: 18pt;
