@@ -797,6 +797,7 @@ $.kingdom.Kingdom = Class.create(
 		name = value;
 		this.choices = new $.kingdom.Choices(name);
 		this.choices.removeName();
+		this.choices.setName(name);
 	    }
 	    else if (key)
 		this.setChoice(key, value);
