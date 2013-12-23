@@ -166,6 +166,31 @@ img.buildingSite
     padding: 0;
 }
 
+.itemslots span {
+    border: 1px solid blue;
+    padding: 0 5px;
+    margin: 0 5px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.itemslots span.Minor {
+    background-color: #aea;
+}
+
+.itemslots span.Medium {
+    background-color: #aae;
+}
+
+.itemslots span.Major {
+    background-color: #eae;
+}
+
+.itemslots span.cheap {
+    font-style: italic;
+    color: red;
+}
+
 .cityDistrict
 {
     display: inline-block;

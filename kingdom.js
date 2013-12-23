@@ -22,6 +22,14 @@ String.prototype.toId = function()
     return this.replace(/[^a-zA-Z0-9]/g, '_');
 }
 
+String.prototype.intersect = function(other)
+{
+    if (!other || !this)
+	return false;
+    else
+	return (this.indexOf(other) >= 0 || other.indexOf(this) >= 0);
+}
+
 Number.prototype.plus = function()
 {
     if (this >= 0)
@@ -477,6 +485,7 @@ $.kingdom.Kingdom = Class.create(
 	this.leaderTable = new $.kingdom.LeaderTable(this, this.peopleTable);
 	this.resourceTable = new $.kingdom.ResourceTable(this);
 	// load cities
+	this.magicItemSource = new $.kingdom.MagicItemSource();
 	var cityNames = this.getArrayChoice('cityNames');
 	this.cities = {};
 	$.each(cityNames, $.proxy(function (index, cityName)
@@ -486,7 +495,14 @@ $.kingdom.Kingdom = Class.create(
 	    city.render();
 	}, this));
 	this.cityBuilder = new $.kingdom.CityBuilder(this);
-	// Handle add city
+	// Handle buttons
+	$('#fillItemSlots').click($.proxy(function ()
+	{
+	    $.each(this.cities, $.proxy(function (cityName) {
+		var city = this.cities[cityName];
+		city.fillItemSlots();
+	    }, this));
+	}, this));
 	$('#addCityButton').click($.proxy(function ()
 	{
 	    new $.kingdom.City(this);
@@ -2407,6 +2423,7 @@ $.kingdom.City = Class.create(
 	this.kingdom = kingdom;
 	this.terrain = null;
 	this.name = name || "";
+	this.itemSlots = { 'minor': [], 'medium': [], 'major': [] };
 	this.reset();
 	this.load();
 	this.render();
@@ -2454,6 +2471,9 @@ $.kingdom.City = Class.create(
 	    var district = new $.kingdom.District(this, index);
 	    this.districts.push(district);
 	}
+	this.itemSlots['minor'] = $.kingdom.MagicItem.loadArray(this.getId("minorItems"), this.kingdom);
+	this.itemSlots['medium'] = $.kingdom.MagicItem.loadArray(this.getId("mediumItems"), this.kingdom);
+	this.itemSlots['major'] = $.kingdom.MagicItem.loadArray(this.getId("majorItems"), this.kingdom);
     },
 
     save: function ()
@@ -2472,6 +2492,9 @@ $.kingdom.City = Class.create(
 	    index++;
 	}
 	this.kingdom.setChoice("cityNames", Object.keys(this.kingdom.cities));
+	this.kingdom.setChoice(this.getId("minorItems"), this.itemSlots['minor']);
+	this.kingdom.setChoice(this.getId("mediumItems"), this.itemSlots['medium']);
+	this.kingdom.setChoice(this.getId("majorItems"), this.itemSlots['major']);
     },
 
     finishEditingCityName: function (element, newValue, oldValue)
@@ -2623,6 +2646,63 @@ $.kingdom.City = Class.create(
 	this.refreshStats();
     },
 
+    drawItemSlot: function (element, type, index) {
+	if (this.itemSlots[type][index]) {
+	    var item = this.itemSlots[type][index];
+	    element.text(item.name);
+	    element.attr('title', item.classification + ' item worth ' + item.price.commafy() + ' gp');
+	    element.addClass(item.classification);
+	    if (item.price < 4000) {
+		element.addClass('cheap');
+	    }
+	} else {
+	    element.removeClass();
+	    element.text('Empty');
+	}
+    },
+
+    createItemSlot: function (element, type, index) {
+	this.drawItemSlot(element, type, index);
+	element.click($.proxy(function (evt) {
+	    if (this.itemSlots[type][index]) {
+		this.itemSlots[type][index] = null;
+	    } else {
+		this.itemSlots[type][index] = this.kingdom.magicItemSource.chooseItem(type);
+	    }
+	    this.drawItemSlot(element, type, index);
+	    this.save();
+	}, this));
+    },
+
+    refreshItemSlots: function () {
+	this.statblock.find('.itemslots').each($.proxy(function (index, slotSpan) {
+	    slotSpan = $(slotSpan);
+	    var type = slotSpan.attr('type');
+	    var count = parseInt(slotSpan.attr('count'));
+	    slotSpan.empty();
+	    for (var index = 0; index < count; index++) {
+		var info = $('<span/>');
+		slotSpan.append(info);
+		this.createItemSlot(info, type, index);
+	    }
+	}, this));
+    },
+
+    fillItemSlotsOfType: function (type, number) {
+	for (var slot = 0; slot < number; slot++) {
+	    if (this.itemSlots[type][slot] == null) {
+		this.itemSlots[type][slot] = this.kingdom.magicItemSource.chooseItem(type);
+	    }
+	}
+    },
+
+    fillItemSlots: function () {
+	this.fillItemSlotsOfType('minor', this.minorItems);
+	this.fillItemSlotsOfType('medium', this.mediumItems);
+	this.fillItemSlotsOfType('major', this.majorItems);
+	this.refreshItemSlots();
+    },
+
     refreshStats: function ()
     {
 	var output = "";
@@ -2631,10 +2711,11 @@ $.kingdom.City = Class.create(
 	output += "<b>Defense:</b> " + this.defense + "<br/>";
 	output += "<b>Population:</b> " + this.population.commafy() + "<br/>";
 	output += "<b>Half cost buildings:</b> " + Object.keys(this.halfCost).sort().joinAnd() + "<br/>";
-	output += "<b>Minor items:</b> " + this.minorItems + "<br/>";
-	output += "<b>Medium items:</b> " + this.mediumItems + "<br/>";
-	output += "<b>Major items:</b> " + this.majorItems + "<br/>";
+	output += "<b>Minor items (DC 20 for 2 BPs):</b> " + this.minorItems + " <span class='itemslots' type='minor' count='" + this.minorItems + "'></span><br/>";
+	output += "<b>Medium items (DC 35 for 8 BPs):</b> " + this.mediumItems + " <span class='itemslots' type='medium' count='" + this.mediumItems + "'></span><br/>";
+	output += "<b>Major items (DC 50 for 15 BPs):</b> " + this.majorItems + " <span class='itemslots' type='major' count='" + this.majorItems + "'></span><br/>";
 	this.statblock.html(output);
+	this.refreshItemSlots();
     },
 
     apply: function ()
@@ -2912,6 +2993,1087 @@ $.kingdom.CityBuilder = Class.create(
     }
 
 });
+
+// ====================== MagicItem class ======================
+
+$.kingdom.MagicItem = Class.create(
+{
+    init: function (data, name, price) {
+	if ($.isArray(data)) {
+	    this.classification = data[0];
+	    this.name = data[1];
+	    this.price = parseInt(data[2]);
+	} else if ($.type(name) == 'object') {
+	    this.classification = data;
+	    this.name = name.name;
+	    $.each(name, $.proxy(function (key) {
+		this[key] = name[key];
+	    }, this));
+	    this.price = parseInt(name.price);
+	} else {
+	    this.classification = data;
+	    this.name = name;
+	    this.price = price;
+	}
+    },
+
+    toString: function () {
+	return this.classification + ';' + this.name + ';' + this.price;
+    }
+
+});
+
+$.kingdom.MagicItem.loadArray = function (id, kingdom) {
+    var array = kingdom.getArrayChoice(id);
+    var result = [];
+    for (var index = 0; index < array.length; ++index) {
+	if (array[index]) {
+	    result.push(new $.kingdom.MagicItem(array[index].split(';')));
+	} else {
+	    result.push(null);
+	}
+    }
+    return result;
+};
+
+// ====================== MagicItemSource class ======================
+
+$.kingdom.MagicItemSource = Class.create(
+{
+
+    magicItemData: {
+
+	'Core Rulebook': {
+
+	    'Start': [
+		[4, 10, 10, 'Armour and Shields' ],
+		[9, 20, 20, 'Weapons' ],
+		[44, 30, 25, 'Potions' ],
+		[46, 40, 35, 'Rings' ],
+		[null, 50, 45, 'Rods' ],
+		[81, 65, 55, 'Scrolls' ],
+		[null, 68, 75, 'Staves' ],
+		[91, 83, 80, 'Wands' ],
+		[100, 100, 100, 'Wondrous Items' ]
+	    ],
+
+	    'Armour and Shields': [
+		[60, 5, null, { name: '+1 Shield', price: 1000, plus: 1, isShield: true }],
+		[80, 10, null, { name: '+1 Armour', price: 1000, plus: 1 }],
+		[85, 20, null, { name: '+2 Shield', price: 4000, plus: 2, isShield: true }],
+		[87, 30, null, { name: '+2 Armour', price: 4000, plus: 2 }],
+		[null, 40, 8, { name: '+3 Shield', price: 9000, plus: 3, isShield: true }],
+		[null, 50, 16, { name: '+3 Armour', price: 9000, plus: 3 }],
+		[null, 55, 27, { name: '+4 Shield', price: 16000, plus: 4, isShield: true }],
+		[null, 57, 38, { name: '+4 Armour', price: 16000, plus: 4 }],
+		[null, null, 49, { name: '+5 Shield', price: 25000, plus: 5, isShield: true }],
+		[null, null, 57, { name: '+5 Armour', price: 25000, plus: 5 }],
+		[89, 60, 60, 'Specific Armour' ],
+		[91, 63, 63, 'Specific Shield' ],
+		[100, 100, 100, '@addArmourShieldQuality' ]
+	    ],
+
+	    'Specific Armour': [
+		[50, 25, null, { name: 'Mithral Shirt', price: 1100, plus: 0 }],
+		[80, 45, null, { name: 'Dragonhide Plate', price: 1100, plus: 0 }],
+		[100, 57, null, { name: 'Elven Chain', price: 5150, plus: 0 }],
+		[null, 67, null, { name: 'Rhino Hide', price: 5165, plus: 2 }],
+		[null, 82, 10, { name: 'Adamantine Breastplate', price: 10200, plus: 0 }],
+		[null, 97, 20, { name: 'Dwarven Plate', price: 16500, plus: 0 }],
+		[null, 100, 32, { name: 'Banded Mail of Luck', price: 18900, plus: 3 }],
+		[null, null, 50, { name: 'Celestial Armour', price: 22400, plus: 3 }],
+		[null, null, 60, { name: 'Plate Armour of the Deep', price: 24650, plus: 1 }],
+		[null, null, 75, { name: 'Breastplate of Command', price: 25400 }],
+		[null, null, 90, { name: 'Mithral Full Plate of Speed', price: 26500, plus: 1 }],
+		[null, null, 100, { name: 'Demon Armour', price: 52260, plus: 4 }]
+	    ],
+
+	    'Armour Qualities': [
+		[25, 5, 3, { name: 'Glamered', price: 2700 }],
+		[32, 8, 4, { name: 'Light Fortification', plus: 1, type: '|fortification|' }],
+		[52, 11, null, { name: 'Slick', price: 3750, type: '|slick|' }],
+		[92, 17, null, { name: 'Shadow', price: 3750, type: '|shadow|' }],
+		[96, 19, null, { name: 'Spell Resistance (13)', plus: 2, type: '|sr|' }],
+		[97, 29, 7, { name: 'Improved Slick', price: 15000, type: '|slick|' }],
+		[99, 49, 13, { name: 'Improved Shadow', price: 15000, type: '|shadow|' }],
+		[null, 74, 28, { name: 'Energy Resistance', price: 18000, type: '|energy resistance|' }],
+		[null, 79, 33, { name: 'Ghost Touch', plus: 3 }],
+		[null, 84, 35, { name: 'Invulnerability', plus: 3 }],
+		[null, 89, 40, { name: 'Moderate Fortification', plus: 3, type: '|fortification|' }],
+		[null, 94, 42, { name: 'Spell Resistance (15)', plus: 3, type: '|sr|' }],
+		[null, 99, 43, { name: 'Wild', plus: 3 }],
+		[null, null, 48, { name: 'Greater Slick', price: 33750, type: '|slick|' }],
+		[null, null, 58, { name: 'Greater Shadow', price: 33750, type: '|shadow|' }],
+		[null, null, 83, { name: 'Improved Energy Resistance', price: 42000, type: '|energy resistance|' }],
+		[null, null, 88, { name: 'Spell Resistance (17)', plus: 4, type: '|sr|' }],
+		[null, null, 89, { name: 'Etherealness', price: 49000 }],
+		[null, null, 90, { name: 'Undead Controlling', price: 49000 }],
+		[null, null, 92, { name: 'Heavy Fortification', plus: 5, type: '|fortification|' }],
+		[null, null, 94, { name: 'Spell Resistance (19)', plus: 5, type: '|sr|' }],
+		[null, null, 99, { name: 'Greater Energy Resistance', price: 66000, type: '|energy resistance|' }],
+		[100, 100, 100, '@rollTwice']
+	    ],
+
+	    'Specific Shield': [
+		[30, 20, null, { name: 'Darkwood Buckler', price: 203, plus: 0, isShield: true }],
+		[80, 45, null, { name: 'Darkwood Shield', price: 257, plus: 0, isShield: true }],
+		[95, 70, null, { name: 'Mithral Heavy Shield', price: 1020, plus: 0, isShield: true }],
+		[100, 85, 20, { name: 'Caster\'s Shield', price: 3153, plus: 1, isShield: true }],
+		[null, 90, 40, { name: 'Spined Shield', price: 5580, plus: 1, isShield: true }],
+		[null, 95, 60, { name: 'Lion\'s Shield', price: 9170, plus: 2, isShield: true }],
+		[null, 100, 90, { name: 'Winged Shield', price: 17257, plus: 3, isShield: true }],
+		[null, null, 100, { name: 'Absorbing Shield', price: 50170, plus: 1, isShield: true }]
+	    ],
+
+	    'Shield Qualities': [
+		[20, 10, 5, { name: 'Arrow Catching', plus: 1 }],
+		[40, 20, 8, { name: 'Bashing', plus: 1 }],
+		[50, 25, 10, { name: 'Blinding', plus: 1 }],
+		[75, 40, 15, { name: 'Light Fortification', plus: 1, type: '|fortification|' }],
+		[92, 50, 20, { name: 'Arrow Deflection', plus: 2 }],
+		[97, 57, 25, { name: 'Animated', plus: 2 }],
+		[99, 59, null, { name: 'Spell Resistance (13)', plus: 2, type: '|sr|' }],
+		[null, 79, 41, { name: 'Energy Resistance', price: 18000, type: '|energy resistance|' }],
+		[null, 85, 46, { name: 'Ghost Touch', plus: 3 }],
+		[null, 95, 56, { name: 'Moderate Fortification', plus: 3, type: '|fortification|' }],
+		[null, 98, 58, { name: 'Spell Resistance (15)', plus: 3, type: '|sr|' }],
+		[null, 99, 59, { name: 'Wild', plus: 3 }],
+		[null, null, 84, { name: 'Improved Energy Resistance', price: 42000, type: '|energy resistance|' }],
+		[null, null, 86, { name: 'Spell Resistance (17)', plus: 4, type: '|sr|' }],
+		[null, null, 87, { name: 'Undead Controlling', price: 49000 }],
+		[null, null, 91, { name: 'Heavy Fortification', plus: 5, type: '|fortification|' }],
+		[null, null, 93, { name: 'Reflecting', plus: 5 }],
+		[null, null, 94, { name: 'Spell Resistance (19)', plus: 5, type: '|sr|' }],
+		[null, null, 99, { name: 'Greater Energy Resistance', price: 66000, type: '|energy resistance|' }],
+		[100, 100, 100, '@rollTwice' ]
+	    ],
+
+	    'Weapons': [
+		[70, 10, null, { name: '+1 Random Weapon', price: 2000, plus: 1 }],
+		[85, 29, null, { name: '+2 Random Weapon', price: 8000, plus: 2 }],
+		[null, 58, 20, { name: '+3 Random Weapon', price: 18000, plus: 3 }],
+		[null, 62, 38, { name: '+4 Random Weapon', price: 32000, plus: 4 }],
+		[null, null, 49, { name: '+5 Random Weapon', price: 50000, plus: 5 }],
+		[90, 68, 63, 'Specific Weapon'],
+		[100, 100, 100, '@addWeaponQuality']
+	    ],
+
+	    'Specific Weapon': [
+		[15, null, null, { name: 'Sleep Arrow', price: 132, plus: 1, isAmmo: true }],
+		[25, null, null, { name: 'Screaming Bolt', price: 267, plus: 2, isAmmo: true }],
+		[45, null, null, { name: 'Masterwork Silver Dagger', price: 322, plus: 0 }],
+		[65, null, null, { name: 'Masterwork Cold Iron Longsword', price: 330, plus: 0 }],
+		[75, 9, null, { name: 'Javelin of Lightning', price: 1500, plus: 0, noQualities: true }],
+		[80, 15, null, { name: 'Slaying Arrow', price: 2282, plus: 1, isAmmo: true }],
+		[90, 24, null, { name: 'Adamantine Dagger', price: 3002, plus: 0 }],
+		[100, 33, null, { name: 'Adamantine Battleaxe', price: 3010, plus: 0 }],
+		[null, 37, null, { name: 'Slaying Arrow (Greater)', price: 4057, plus: 1, isAmmo: true }],
+		[null, 40, null, { name: 'Shatterspike', price: 4315, plus: 4 }],
+		[null, 46, null, { name: 'Dagger of Venom', price: 8302, plus: 1 }],
+		[null, 51, null, { name: 'Trident of Warning', price: 10115, plus: 2 }],
+		[null, 57, 4, { name: 'Assassin\'s Dagger', price: 10302, plus: 2 }],
+		[null, 62, 7, { name: 'Shifter\'s Sorrow', price: 12780, plus: 1 }],
+		[null, 66, 9, { name: 'Trident of Fish Command', price: 18650, plus: 1 }],
+		[null, 74, 13, { name: 'Flame Tongue', price: 20715, plus: 1 }],
+		[null, 79, 17, { name: 'Luck Blade (0 Wishes)', price: 22060, plus: 2 }],
+		[null, 86, 24, { name: 'Sword of Subtlety', price: 22310, plus: 4 }],
+		[null, 91, 31, { name: 'Sword of the Planes', price: 22315, plus: 2 }],
+		[null, 95, 37, { name: 'Nine Lives Stealer', price: 23057, plus: 2 }],
+		[null, 98, 42, { name: 'Oathbow', price: 25600, plus: 2, isRanged: true }],
+		[null, 100, 46, { name: 'Sword of Life Stealing', price: 25715, plus: 2 }],
+		[null, null, 51, { name: 'Mace of Terror', price: 38552, plus: 2 }],
+		[null, null, 57, { name: 'Life-Drinker', price: 40320, plus: 1 }],
+		[null, null, 62, { name: 'Sylvan Scimitar', price: 47315, plus: 3 }],
+		[null, null, 67, { name: 'Rapier of Puncturing', price: 50320, plus: 4 }],
+		[null, null, 73, { name: 'Sun Blade', price: 50335, plus: 4 }],
+		[null, null, 79, { name: 'Frost Brand', price: 54475, plus: 3 }],
+		[null, null, 84, { name: 'Dwarven Thrower', price: 60312, plus: 4 }],
+		[null, null, 91, { name: 'Luck Blade (1 Wish)', price: 62360, plus: 2 }],
+		[null, null, 95, { name: 'Mace of Smiting', price: 75312, plus: 3 }],
+		[null, null, 97, { name: 'Luck Blade (2 Wishes)', price: 102660, plus: 2 }],
+		[null, null, 99, { name: 'Holy Avenger', price: 120630, plus: 7 }],
+		[null, null, 100, { name: 'Luck Blade (3 Wishes)', price: 142960, plus: 2 }]
+	    ],
+
+	    'Melee Weapon Qualities': [
+		[10, 6, 3, { name: 'Bane', plus: 1 }],
+		[17, 12, null, { name: 'Defending', plus: 1 }],
+		[27, 19, 6, { name: 'Flaming', plus: 1 }],
+		[37, 26, 9, { name: 'Frost', plus: 1 }],
+		[47, 33, 12, { name: 'Shock', plus: 1 }],
+		[56, 38, 15, { name: 'Ghost Touch', plus: 1 }],
+		[67, 44, null, { name: 'Keen', plus: 1 }],
+		[71, 48, 19, { name: 'Ki Focus', plus: 1 }],
+		[75, 50, null, { name: 'Merciful', plus: 1 }],
+		[82, 54, 21, { name: 'Mighty Cleaving', plus: 1 }],
+		[87, 59, 24, { name: 'Spell Storing', plus: 1 }],
+		[91, 63, 28, { name: 'Throwing', plus: 1 }],
+		[95, 65, 32, { name: 'Thundering', plus: 1 }],
+		[99, 69, 36, { name: 'Vicious', plus: 1 }],
+		[null, 72, 41, { name: 'Anarchic', plus: 2 }],
+		[null, 75, 46, { name: 'Axiomatic', plus: 2 }],
+		[null, 78, 49, { name: 'Disruption', plus: 2 }],
+		[null, 81, 54, { name: 'Flaming Burst', plus: 2 }],
+		[null, 84, 59, { name: 'Icy Burst', plus: 2 }],
+		[null, 87, 64, { name: 'Holy', plus: 2 }],
+		[null, 90, 69, { name: 'Shocking Burst', plus: 2 }],
+		[null, 93, 74, { name: 'Unholy', plus: 2 }],
+		[null, 95, 78, { name: 'Wounding', plus: 2 }],
+		[null, null, 83, { name: 'Speed', plus: 3 }],
+		[null, null, 86, { name: 'Brilliant Energy', plus: 4 }],
+		[null, null, 88, { name: 'Dancing', plus: 4 }],
+		[null, null, 90, { name: 'Vorpal', plus: 5 }],
+		[100, 100, 100, '@rollTwice']
+	    ],
+
+	    'Ranged Weapon Qualities': [
+		[12, 8, 4, { name: 'Bane', plus: 1 }],
+		[25, 16, 8, { name: 'Distance', plus: 1 }],
+		[40, 28, 12, { name: 'Flaming', plus: 1 }],
+		[55, 40, 16, { name: 'Frost', plus: 1 }],
+		[60, 42, null, { name: 'Merciful', plus: 1 }],
+		[68, 47, 21, { name: 'Returning', plus: 1 }],
+		[83, 59, 25, { name: 'Shock', plus: 1 }],
+		[93, 64, 27, { name: 'Seeking', plus: 1 }],
+		[99, 68, 29, { name: 'Thundering', plus: 1 }],
+		[null, 71, 34, { name: 'Anarchic', plus: 2 }],
+		[null, 74, 39, { name: 'Axiomatic', plus: 2 }],
+		[null, 79, 49, { name: 'Flaming Burst', plus: 2 }],
+		[null, 82, 54, { name: 'Holy', plus: 2 }],
+		[null, 87, 64, { name: 'Icy Burst', plus: 2 }],
+		[null, 92, 74, { name: 'Shocking Burst', plus: 2 }],
+		[null, 95, 79, { name: 'Unholy', plus: 2 }],
+		[null, null, 84, { name: 'Speed', plus: 3 }],
+		[null, null, 90, { name: 'Brilliant Energy', plus: 4 }],
+		[100, 100, 100, '@rollTwice']
+	    ],
+
+	    'Potions': [
+		[20, null, null, { name: '0th-level Potion', price: 25 }],
+		[60, 20, null, { name: '1st-level Potion', price: 50 }],
+		[100, 60, 20, { name: '2nd-level Potion', price: 300 }],
+		[null, 100, 100, { name: '3rd-level Potion', price: 750 }]
+	    ],
+
+	    'Rings': [
+		[18, null, null, { name: 'Ring of Protection +1', price: 2000 }],
+		[28, null, null, { name: 'Ring of Feather Falling', price: 2200 }],
+		[36, null, null, { name: 'Ring of Sustenance', price: 2500 }],
+		[44, null, null, { name: 'Ring of Climbing', price: 2500 }],
+		[52, null, null, { name: 'Ring of Jumping', price: 2500 }],
+		[60, null, null, { name: 'Ring of Swimming', price: 2500 }],
+		[70, 5, null, { name: 'Ring of Counterspells', price: 4000 }],
+		[75, 8, null, { name: 'Ring of Mind Shielding', price: 8000 }],
+		[80, 18, null, { name: 'Ring of Protection +2', price: 8000 }],
+		[85, 23, null, { name: 'Ring of Force Shield', price: 8500 }],
+		[90, 28, null, { name: 'Ring of the Ram', price: 8600 }],
+		[null, 34, null, { name: 'Ring of Climbing, Improved', price: 10000 }],
+		[null, 40, null, { name: 'Ring of Jumping, Improved', price: 10000 }],
+		[null, 46, null, { name: 'Ring of Swimming, Improved', price: 10000 }],
+		[93, 50, null, { name: 'Ring of Animal Friendship', price: 10800 }],
+		[96, 56, 2, { name: 'Ring of Energy Resistance, Minor', price: 12000 }],
+		[98, 61, null, { name: 'Ring of Chameleon Power', price: 12700 }],
+		[100, 66, null, { name: 'Ring of Water Walking', price: 15000 }],
+		[null, 71, 7, { name: 'Ring of Protection +3', price: 18000 }],
+		[null, 76, 10, { name: 'Ring of Spell Storing, Minor', price: 18000 }],
+		[null, 81, 15, { name: 'Ring of Invisibility', price: 20000 }],
+		[null, 85, 19, { name: 'Ring of Wizardry (I)', price: 20000 }],
+		[null, 90, 25, { name: 'Ring of Evasion', price: 25000 }],
+		[null, 93, 28, { name: 'Ring of X-ray Vision', price: 25000 }],
+		[null, 97, 32, { name: 'Ring of Blinking', price: 27000 }],
+		[null, 100, 39, { name: 'Ring of Energy Resistance, Major', price: 28000 }],
+		[null, null, 49, { name: 'Ring of Protection +4', price: 32000 }],
+		[null, null, 55, { name: 'Ring of Wizardry (II)', price: 40000 }],
+		[null, null, 60, { name: 'Ring of Freedom of Movement', price: 40000 }],
+		[null, null, 63, { name: 'Ring of Energy Resistance, Greater', price: 44000 }],
+		[null, null, 65, { name: 'Ring of Friend Shield (Pair)', price: 50000 }],
+		[null, null, 70, { name: 'Ring of Protection +5', price: 50000 }],
+		[null, null, 74, { name: 'Ring of Shooting Stars', price: 50000 }],
+		[null, null, 79, { name: 'Ring of Spell Storing', price: 50000 }],
+		[null, null, 83, { name: 'Ring of Wizardry (III)', price: 70000 }],
+		[null, null, 86, { name: 'Ring of Telekinesis', price: 75000 }],
+		[null, null, 88, { name: 'Ring of Regeneration', price: 90000 }],
+		[null, null, 91, { name: 'Ring of Spell Turning', price: 100000 }],
+		[null, null, 93, { name: 'Ring of Wizardy (IV)', price: 100000 }],
+		[null, null, 94, { name: 'Ring of Three Wishes', price: 120000 }],
+		[null, null, 95, { name: 'Ring of Djinni Calling', price: 125000 }],
+		[null, null, 96, { name: 'Ring of Air Elemental Command', price: 200000 }],
+		[null, null, 97, { name: 'Ring of Earth Elemental Command', price: 200000 }],
+		[null, null, 98, { name: 'Ring of Fire Elemental Command', price: 200000 }],
+		[null, null, 99, { name: 'Ring of Water Elemental Command', price: 200000 }],
+		[null, null, 100, { name: 'Ring of Spell Storing, Major', price: 200000 }]
+	    ],
+
+	    'Rods': [
+		[null, 7, null, { name: 'Metamagic Rod, Enlarge, Lesser', price: 3000 }],
+		[null, 14, null, { name: 'Metamagic Rod, Extend, Lesser', price: 3000 }],
+		[null, 21, null, { name: 'Metamagic Rod, Silent, Lesser', price: 3000 }],
+		[null, 28, null, { name: 'Immovable Rod', price: 5000 }],
+		[null, 35, null, { name: 'Metamagic Rod, Empower, Lesser', price: 9000 }],
+		[null, 42, null, { name: 'Rod of Metal and Mineral Detection', price: 10500 }],
+		[null, 53, 4, { name: 'Rod of Cancellation', price: 11000 }],
+		[null, 57, 6, { name: 'Metamagic Rod, Enlarge', price: 11000 }],
+		[null, 61, 8, { name: 'Metamagic Rod, Extend', price: 11000 }],
+		[null, 65, 10, { name: 'Metamagic Rod, Silent', price: 11000 }],
+		[null, 71, 14, { name: 'Rod of Wonder', price: 12000 }],
+		[null, 79, 19, { name: 'Rod of the Python', price: 13000 }],
+		[null, 83, null, { name: 'Metamagic Rod, Maximize, Lesser', price: 14000 }],
+		[null, 89, 21, { name: 'Rod of Flame Extinguishing', price: 15000 }],
+		[null, 97, 25, { name: 'Rod of the Viper', price: 19000 }],
+		[null, null, 30, { name: 'Rod of Enemy Detection', price: 23500 }],
+		[null, null, 36, { name: 'Metamagic Rod, Enlarge, Greater', price: 24500 }],
+		[null, null, 42, { name: 'Metamagic Rod, Extend, Greater', price: 24500 }],
+		[null, null, 48, { name: 'Metamagic Rod, Silent, Greater', price: 24500 }],
+		[null, null, 53, { name: 'Rod of Splendor', price: 25000 }],
+		[null, null, 58, { name: 'Rod of Withering', price: 25000 }],
+		[null, 99, 64, { name: 'Metamagic Rod, Empower', price: 32500 }],
+		[null, null, 69, { name: 'Rod of Thunder and Lightning', price: 33000 }],
+		[null, 100, 73, { name: 'Metamagic Rod, Quicken, Lesser', price: 35000 }],
+		[null, null, 77, { name: 'Rod of Negation', price: 37000 }],
+		[null, null, 80, { name: 'Rod of Absorption', price: 50000 }],
+		[null, null, 84, { name: 'Rod of Flailing', price: 50000 }],
+		[null, null, 86, { name: 'Metamagic Rod, Maximize', price: 54000 }],
+		[null, null, 88, { name: 'Rod of Rulership', price: 60000 }],
+		[null, null, 90, { name: 'Rod of Security', price: 61000 }],
+		[null, null, 92, { name: 'Rod of Lordly Might', price: 70000 }],
+		[null, null, 94, { name: 'Metamagic Rod, Empower, Greater', price: 73000 }],
+		[null, null, 96, { name: 'Metamagic Rod, Quicken', price: 75500 }],
+		[null, null, 98, { name: 'Rod of Alertness', price: 85000 }],
+		[null, null, 99, { name: 'Metamagic Rod, Maximize, Greater', price: 121500 }],
+		[null, null, 100, { name: 'Metamagic Rod, Quicken, Greater', price: 170000 }]
+	    ],
+
+	    'Scrolls': [
+		[5, null, null, { name: '0th Level Scroll', price: 12.5 }],
+		[50, null, null, { name: '1st Level Scroll', price: 25 }],
+		[95, 5, null, { name: '2nd Level Scroll', price: 150 }],
+		[100, 65, null, { name: '3rd Level Scroll', price: 375 }],
+		[null, 95, 5, { name: '4th Level Scroll', price: 700 }],
+		[null, 100, 50, { name: '5th Level Scroll', price: 1125 }],
+		[null, null, 70, { name: '6th Level Scroll', price: 1650 }],
+		[null, null, 85, { name: '7th Level Scroll', price: 2275 }],
+		[null, null, 95, { name: '8th Level Scroll', price: 3000 }],
+		[null, null, 100, { name: '9th Level Scroll', price: 3825 }]
+	    ],
+
+	    'Staves': [
+		[null, 15, 3, { name: 'Staff of Charming', price: 17600 }],
+		[null, 30, 9, { name: 'Staff of Fire', price: 18950 }],
+		[null, 40, 11, { name: 'Staff of Swarming Insects', price: 22800 }],
+		[null, 55, 13, { name: 'Staff of Size Alteration', price: 26150 }],
+		[null, 75, 19, { name: 'Staff of Healing', price: 29600 }],
+		[null, 90, 24, { name: 'Staff of Frost', price: 41400 }],
+		[null, 95, 31, { name: 'Staff of Illumination', price: 51500 }],
+		[null, 100, 38, { name: 'Staff of Defense', price: 62000 }],
+		[null, null, 45, { name: 'Staff of Abjuration', price: 82000 }],
+		[null, null, 50, { name: 'Staff of Conjuration', price: 82000 }],
+		[null, null, 55, { name: 'Staff of Divination', price: 82000 }],
+		[null, null, 60, { name: 'Staff of Enchantment', price: 82000 }],
+		[null, null, 65, { name: 'Staff of Evocation', price: 82000 }],
+		[null, null, 70, { name: 'Staff of Illusion', price: 82000 }],
+		[null, null, 75, { name: 'Staff of Necromancy', price: 82000 }],
+		[null, null, 80, { name: 'Staff of Transmutation', price: 82000 }],
+		[null, null, 85, { name: 'Staff of Earth and Stone', price: 85800 }],
+		[null, null, 90, { name: 'Staff of Woodlands', price: 100400 }],
+		[null, null, 95, { name: 'Staff of Life', price: 109400 }],
+		[null, null, 98, { name: 'Staff of Passage', price: 206900 }],
+		[null, null, 100, { name: 'Staff of Power', price: 235000 }]
+	    ],
+
+	    'Wands': [
+		[5, null, null, { name: '0th Level Wand', price: 375 }],
+		[60, null, null, { name: '1st Level Wand', price: 750 }],
+		[100, 60, null, { name: '2nd Level Wand', price: 4500 }],
+		[null, 100, 60, { name: '3rd Level Wand', price: 11250 }],
+		[null, null, 100, { name: '4th Level Wand', price: 21000 }]
+	    ],
+
+	    'Wondrous Items': [
+		[1, null, null, { name: 'Feather Token, Anchor', price: 50 }],
+		[2, null, null, { name: 'Universal Solvent', price: 50 }],
+		[3, null, null, { name: 'Elixir of Love', price: 150 }],
+		[4, null, null, { name: 'Unguent of Timelessness', price: 150 }],
+		[5, null, null, { name: 'Feather Token, Fan', price: 200 }],
+		[6, null, null, { name: 'Dust of Tracelessness', price: 250 }],
+		[7, null, null, { name: 'Elixir of Hiding', price: 250 }],
+		[8, null, null, { name: 'Elixir of Tumbling', price: 250 }],
+		[9, null, null, { name: 'Elixir of Swimming', price: 250 }],
+		[10, null, null, { name: 'Elixir of Vision', price: 250 }],
+		[11, null, null, { name: 'Silversheen', price: 250 }],
+		[12, null, null, { name: 'Feather Token, Bird', price: 300 }],
+		[13, null, null, { name: 'Feather Token, Tree', price: 400 }],
+		[14, null, null, { name: 'Feather Token, Swan Boat', price: 450 }],
+		[15, null, null, { name: 'Elixir of Truth', price: 500 }],
+		[16, null, null, { name: 'Feather Token, Whip', price: 500 }],
+		[17, null, null, { name: 'Dust of Dryness', price: 850 }],
+		[18, null, null, { name: 'Hand of the Mage', price: 900 }],
+		[19, null, null, { name: 'Bracers of Armor +1', price: 1000 }],
+		[20, null, null, { name: 'Cloak of Resistance +1', price: 1000 }],
+		[21, null, null, { name: 'Pearl of Power, 1st-level Spell', price: 1000 }],
+		[22, null, null, { name: 'Phylactery of Faithfulness', price: 1000 }],
+		[23, null, null, { name: 'Salve of Slipperiness', price: 1000 }],
+		[24, null, null, { name: 'Elixir of Fire Breath', price: 1100 }],
+		[25, null, null, { name: 'Pipes of the Sewers', price: 1150 }],
+		[26, null, null, { name: 'Dust of Illusion', price: 1200 }],
+		[27, null, null, { name: 'Brooch of Shielding', price: 1500 }],
+		[28, null, null, { name: 'Necklace of Fireballs Type I', price: 1650 }],
+		[29, null, null, { name: 'Dust of Appearance', price: 1800 }],
+		[30, null, null, { name: 'Hat of Disguise', price: 1800 }],
+		[31, null, null, { name: 'Pipes of Sounding', price: 1800 }],
+		[32, null, null, { name: 'Efficient Quiver', price: 1800 }],
+		[33, null, null, { name: 'Amulet of Natural Armor +1', price: 2000 }],
+		[34, null, null, { name: 'Handy Haversack', price: 2000 }],
+		[35, null, null, { name: 'Horn of Fog', price: 2000 }],
+		[36, null, null, { name: 'Elemental Gem', price: 2250 }],
+		[37, null, null, { name: 'Robe of Bones', price: 2400 }],
+		[38, null, null, { name: 'Sovereign Glue', price: 2400 }],
+		[39, null, null, { name: 'Bag of Holding Type I', price: 2500 }],
+		[40, null, null, { name: 'Boots of Elvenkind', price: 2500 }],
+		[41, null, null, { name: 'Boots of the Winterlands', price: 2500 }],
+		[42, null, null, { name: 'Candle of Truth', price: 2500 }],
+		[43, null, null, { name: 'Cloak of Elvenkind', price: 2500 }],
+		[44, null, null, { name: 'Eyes of the Eagle', price: 2500 }],
+		[45, null, null, { name: 'Goggles of Minute Seeing', price: 2500 }],
+		[46, null, null, { name: 'Scarab, Golembane', price: 2500 }],
+		[47, null, null, { name: 'Necklace of Fireballs Type II', price: 2700 }],
+		[48, null, null, { name: 'Stone of Alarm', price: 2700 }],
+		[49, null, null, { name: 'Bead of Force', price: 3000 }],
+		[50, null, null, { name: 'Chime of Opening', price: 3000 }],
+		[51, null, null, { name: 'Horseshoes of Speed', price: 3000 }],
+		[52, null, null, { name: 'Rope of Climbing', price: 3000 }],
+		[53, null, null, { name: 'Bag of Tricks, Gray', price: 3400 }],
+		[54, null, null, { name: 'Dust of Disappearance', price: 3500 }],
+		[55, null, null, { name: 'Lens of Detection', price: 3500 }],
+		[56, null, null, { name: 'Vestment, Druid\'s', price: 3750 }],
+		[57, null, null, { name: 'Figurine of Wondrous Power, Silver Raven', price: 3800 }],
+		[58, null, null, { name: 'Belt of Giant Strength +2', price: 4000 }],
+		[59, null, null, { name: 'Belt of Incredible Dexterity +2', price: 4000 }],
+		[60, null, null, { name: 'Belt of Mighty Constitution +2', price: 4000 }],
+		[61, null, null, { name: 'Bracers of Armor +2', price: 4000 }],
+		[62, null, null, { name: 'Cloak of Resistance +2', price: 4000 }],
+		[63, null, null, { name: 'Gloves of Arrow Snaring', price: 4000 }],
+		[64, null, null, { name: 'Headband of Alluring Charisma +2', price: 4000 }],
+		[65, null, null, { name: 'Headband of Inspired Wisdom +2', price: 4000 }],
+		[66, null, null, { name: 'Headband of Vast Intelligence +2', price: 4000 }],
+		[67, null, null, { name: 'Ioun Stone, Clear Spindle', price: 4000 }],
+		[68, null, null, { name: 'Restorative Ointment', price: 4000 }],
+		[69, null, null, { name: 'Marvelous Pigments', price: 4000 }],
+		[70, null, null, { name: 'Pearl of Power, 2nd-level Spell', price: 4000 }],
+		[71, null, null, { name: 'Stone Salve', price: 4000 }],
+		[72, null, null, { name: 'Necklace of Fireballs Type III', price: 4350 }],
+		[73, null, null, { name: 'Circlet of Persuasion', price: 4500 }],
+		[74, null, null, { name: 'Slippers of Spider Climbing', price: 4800 }],
+		[75, null, null, { name: 'Incense of Meditation', price: 4900 }],
+		[76, null, null, { name: 'Amulet of Mighty Fists +1', price: 5000 }],
+		[77, null, null, { name: 'Bag of Holding Type II', price: 5000 }],
+		[78, null, null, { name: 'Bracers of Archery, Lesser', price: 5000 }],
+		[79, null, null, { name: 'Ioun Stone, Dusty Rose Prism', price: 5000 }],
+		[80, null, null, { name: 'Helm of Comprehend Languages And Read Magic', price: 5200 }],
+		[81, null, null, { name: 'Vest of Escape', price: 5200 }],
+		[82, null, null, { name: 'Eversmoking Bottle', price: 5400 }],
+		[83, null, null, { name: 'Sustaining Spoon', price: 5400 }],
+		[84, null, null, { name: 'Necklace of Fireballs Type IV', price: 5400 }],
+		[85, null, null, { name: 'Boots of Striding And Springing', price: 5500 }],
+		[86, null, null, { name: 'Wind Fan', price: 5500 }],
+		[87, null, null, { name: 'Necklace of Fireballs Type V', price: 5850 }],
+		[88, null, null, { name: 'Horseshoes of A Zephyr', price: 6000 }],
+		[89, null, null, { name: 'Pipes of Haunting', price: 6000 }],
+		[90, null, null, { name: 'Gloves of Swimming And Climbing', price: 6250 }],
+		[91, null, null, { name: 'Crown of Blasting, Minor', price: 6480 }],
+		[92, null, null, { name: 'Horn of Goodness/Evil', price: 6500 }],
+		[93, null, null, { name: 'Robe of Useful Items', price: 7000 }],
+		[94, null, null, { name: 'Boat, Folding', price: 7200 }],
+		[95, null, null, { name: 'Cloak of the Manta Ray', price: 7200 }],
+		[96, null, null, { name: 'Bottle of Air', price: 7250 }],
+		[97, null, null, { name: 'Bag of Holding Type III', price: 7400 }],
+		[98, null, null, { name: 'Periapt of Health', price: 7400 }],
+		[99, null, null, { name: 'Boots of Levitation', price: 7500 }],
+		[100, null, null, { name: 'Harp of Charming', price: 7500 }],
+		[null, 1, null, { name: 'Amulet of Natural Armor +2', price: 8000 }],
+		[null, 2, null, { name: 'Golem Manual, Flesh', price: 8000 }],
+		[null, 3, null, { name: 'Hand of Glory', price: 8000 }],
+		[null, 4, null, { name: 'Ioun Stone, Deep Red Sphere', price: 8000 }],
+		[null, 5, null, { name: 'Ioun Stone, Incandescent Blue Sphere', price: 8000 }],
+		[null, 6, null, { name: 'Ioun Stone, Pale Blue Rhomboid', price: 8000 }],
+		[null, 7, null, { name: 'Ioun Stone, Pink And Green Sphere', price: 8000 }],
+		[null, 8, null, { name: 'Ioun Stone, Pink Rhomboid', price: 8000 }],
+		[null, 9, null, { name: 'Ioun Stone, Scarlet And Blue Sphere', price: 8000 }],
+		[null, 10, null, { name: 'Deck of Illusions', price: 8100 }],
+		[null, 11, null, { name: 'Necklace of Fireballs Type VI', price: 8100 }],
+		[null, 12, null, { name: 'Candle of Invocation', price: 8400 }],
+		[null, 13, null, { name: 'Robe of Blending', price: 8400 }],
+		[null, 14, null, { name: 'Bag of Tricks, Rust', price: 8500 }],
+		[null, 15, null, { name: 'Necklace of Fireballs Type VII', price: 8700 }],
+		[null, 16, null, { name: 'Bracers of Armor +3', price: 9000 }],
+		[null, 17, null, { name: 'Cloak of Resistance +3', price: 9000 }],
+		[null, 18, null, { name: 'Decanter of Endless Water', price: 9000 }],
+		[null, 19, null, { name: 'Necklace of Adaptation', price: 9000 }],
+		[null, 20, null, { name: 'Pearl of Power, 3rd-level Spell', price: 9000 }],
+		[null, 21, null, { name: 'Figurine of Wondrous Power, Serpentine Owl', price: 9100 }],
+		[null, 22, null, { name: 'Strand of Prayer Beads, Lesser', price: 9600 }],
+		[null, 23, null, { name: 'Bag of Holding Type IV', price: 10000 }],
+		[null, 24, null, { name: 'Belt of Physical Might +2', price: 10000 }],
+		[null, 25, null, { name: 'Figurine of Wondrous Power, Bronze Griffon', price: 10000 }],
+		[null, 26, null, { name: 'Figurine of Wondrous Power, Ebony Fly', price: 10000 }],
+		[null, 27, null, { name: 'Glove of Storing', price: 10000 }],
+		[null, 28, null, { name: 'Headband of Mental Prowess +2', price: 10000 }],
+		[null, 29, null, { name: 'Ioun Stone, Dark Blue Rhomboid', price: 10000 }],
+		[null, 30, null, { name: 'Cape of the Mountebank', price: 10080 }],
+		[null, 31, null, { name: 'Phylactery of Negative Channeling', price: 11000 }],
+		[null, 32, null, { name: 'Phylactery of Positive Channeling', price: 11000 }],
+		[null, 33, null, { name: 'Gauntlet of Rust', price: 11500 }],
+		[null, 34, null, { name: 'Boots of Speed', price: 12000 }],
+		[null, 35, null, { name: 'Goggles of Night', price: 12000 }],
+		[null, 36, null, { name: 'Golem Manual, Clay', price: 12000 }],
+		[null, 37, null, { name: 'Medallion of Thoughts', price: 12000 }],
+		[null, 38, null, { name: 'Blessed Book', price: 12500 }],
+		[null, 39, null, { name: 'Gem of Brightness', price: 13000 }],
+		[null, 40, null, { name: 'Lyre of Building', price: 13000 }],
+		[null, 41, null, { name: 'Robe, Monk\'s', price: 13000 }],
+		[null, 42, null, { name: 'Cloak of Arachnida', price: 14000 }],
+		[null, 43, null, { name: 'Belt of Dwarvenkind', price: 14900 }],
+		[null, 44, null, { name: 'Periapt of Wound Closure', price: 15000 }],
+		[null, 45, null, { name: 'Pearl of the Sirines', price: 15300 }],
+		[null, 46, null, { name: 'Figurine of Wondrous Power, Onyx Dog', price: 15500 }],
+		[null, 47, null, { name: 'Bag of Tricks, Tan', price: 16000 }],
+		[null, 48, null, { name: 'Belt of Giant Strength +4', price: 16000 }],
+		[null, 49, null, { name: 'Belt of Incredible Dexterity +4', price: 16000 }],
+		[null, 50, null, { name: 'Belt of Mighty Constitution +4', price: 16000 }],
+		[null, 51, null, { name: 'Belt of Physical Perfection +2', price: 16000 }],
+		[null, 52, null, { name: 'Boots, Winged', price: 16000 }],
+		[null, 53, null, { name: 'Bracers of Armor +4', price: 16000 }],
+		[null, 54, null, { name: 'Cloak of Resistance +4', price: 16000 }],
+		[null, 55, null, { name: 'Headband of Alluring Charisma +4', price: 16000 }],
+		[null, 56, null, { name: 'Headband of Inspired Wisdom +4', price: 16000 }],
+		[null, 57, null, { name: 'Headband of Mental Superiority +2', price: 16000 }],
+		[null, 58, null, { name: 'Headband of Vast Intelligence +4', price: 16000 }],
+		[null, 59, null, { name: 'Pearl of Power, 4th-level Spell', price: 16000 }],
+		[null, 60, null, { name: 'Scabbard of Keen Edges', price: 16000 }],
+		[null, 61, null, { name: 'Figurine of Wondrous Power, Golden Lions', price: 16500 }],
+		[null, 62, null, { name: 'Chime of Interruption', price: 16800 }],
+		[null, 63, null, { name: 'Broom of Flying', price: 17000 }],
+		[null, 64, null, { name: 'Figurine of Wondrous Power, Marble Elephant', price: 17000 }],
+		[null, 65, null, { name: 'Amulet of Natural Armor +3', price: 18000 }],
+		[null, 66, null, { name: 'Ioun Stone, Iridescent Spindle', price: 18000 }],
+		[null, 67, null, { name: 'Bracelet of Friends', price: 19000 }],
+		[null, 68, null, { name: 'Amulet of Mighty Fists +2', price: 20000 }],
+		[null, 69, null, { name: 'Carpet of Flying, 5 ft. By 5 ft.', price: 20000 }],
+		[null, 70, null, { name: 'Horn of Blasting', price: 20000 }],
+		[null, 71, null, { name: 'Ioun Stone, Pale Lavender Ellipsoid', price: 20000 }],
+		[null, 72, null, { name: 'Ioun Stone, Pearly White Spindle', price: 20000 }],
+		[null, 73, null, { name: 'Portable Hole', price: 20000 }],
+		[null, 74, null, { name: 'Stone of Good Luck (luckstone)', price: 20000 }],
+		[null, 75, null, { name: 'Figurine of Wondrous Power, Ivory Goats', price: 21000 }],
+		[null, 76, null, { name: 'Rope of Entanglement', price: 21000 }],
+		[null, 77, null, { name: 'Golem Manual, Stone', price: 22000 }],
+		[null, 78, null, { name: 'Mask of the Skull', price: 22000 }],
+		[null, 79, null, { name: 'Mattock of the Titans', price: 23348 }],
+		[null, 80, null, { name: 'Crown of Blasting, Major', price: 23760 }],
+		[null, 81, null, { name: 'Cloak of Displacement, Minor', price: 24000 }],
+		[null, 82, null, { name: 'Helm of Underwater Action', price: 24000 }],
+		[null, 83, null, { name: 'Bracers of Archery, Greater', price: 25000 }],
+		[null, 84, null, { name: 'Bracers of Armor +5', price: 25000 }],
+		[null, 85, null, { name: 'Cloak of Resistance +5', price: 25000 }],
+		[null, 86, null, { name: 'Eyes of Doom', price: 25000 }],
+		[null, 87, null, { name: 'Pearl of Power, 5th-level Spell', price: 25000 }],
+		[null, 88, null, { name: 'Maul of the Titans', price: 25305 }],
+		[null, 89, null, { name: 'Cloak of the Bat', price: 26000 }],
+		[null, 90, null, { name: 'Iron Bands of Binding', price: 26000 }],
+		[null, 91, null, { name: 'Cube of Frost Resistance', price: 27000 }],
+		[null, 92, null, { name: 'Helm of Telepathy', price: 27000 }],
+		[null, 93, null, { name: 'Periapt of Proof Against Poison', price: 27000 }],
+		[null, 94, null, { name: 'Robe of Scintillating Colors', price: 27000 }],
+		[null, 95, null, { name: 'Manual of Bodily Health +1', price: 27500 }],
+		[null, 96, null, { name: 'Manual of Gainful Exercise +1', price: 27500 }],
+		[null, 97, null, { name: 'Manual of Quickness in Action +1', price: 27500 }],
+		[null, 98, null, { name: 'Tome of Clear Thought +1', price: 27500 }],
+		[null, 99, null, { name: 'Tome of Leadership And Influence +1', price: 27500 }],
+		[null, 100, null, { name: 'Tome of Understanding +1', price: 27500 }],
+		[null, null, 1, { name: 'Dimensional Shackles', price: 28000 }],
+		[null, null, 2, { name: 'Figurine of Wondrous Power, Obsidian Steed', price: 28500 }],
+		[null, null, 3, { name: 'Drums of Panic', price: 30000 }],
+		[null, null, 4, { name: 'Ioun Stone, Orange Prism', price: 30000 }],
+		[null, null, 5, { name: 'Ioun Stone, Pale Green Prism', price: 30000 }],
+		[null, null, 6, { name: 'Lantern of Revealing', price: 30000 }],
+		[null, null, 7, { name: 'Amulet of Natural Armor +4', price: 32000 }],
+		[null, null, 8, { name: 'Amulet of Proof Against Detection And Location', price: 35000 }],
+		[null, null, 9, { name: 'Carpet of Flying, 5 ft. By 10 ft.', price: 35000 }],
+		[null, null, 10, { name: 'Golem Manual, Iron', price: 35000 }],
+		[null, null, 11, { name: 'Belt of Giant Strength +6', price: 36000 }],
+		[null, null, 12, { name: 'Belt of Incredible Dexterity +6', price: 36000 }],
+		[null, null, 13, { name: 'Belt of Mighty Constitution +6', price: 36000 }],
+		[null, null, 14, { name: 'Bracers of Armor +6', price: 36000 }],
+		[null, null, 15, { name: 'Headband of Alluring Charisma +6', price: 36000 }],
+		[null, null, 16, { name: 'Headband of Inspired Wisdom +6', price: 36000 }],
+		[null, null, 17, { name: 'Headband of Vast Intelligence +6', price: 36000 }],
+		[null, null, 18, { name: 'Ioun Stone, Vibrant Purple Prism', price: 36000 }],
+		[null, null, 19, { name: 'Pearl of Power, 6th-level Spell', price: 36000 }],
+		[null, null, 20, { name: 'Scarab of Protection', price: 38000 }],
+		[null, null, 21, { name: 'Belt of Physical Might +4', price: 40000 }],
+		[null, null, 22, { name: 'Headband of Mental Prowess +4', price: 40000 }],
+		[null, null, 23, { name: 'Ioun Stone, Lavender And Green Ellipsoid', price: 40000 }],
+		[null, null, 24, { name: 'Ring Gates', price: 40000 }],
+		[null, null, 25, { name: 'Crystal Ball', price: 42000 }],
+		[null, null, 26, { name: 'Golem Manual, Stone Guardian', price: 44000 }],
+		[null, null, 27, { name: 'Amulet of Mighty Fists +3', price: 45000 }],
+		[null, null, 28, { name: 'Strand of Prayer Beads', price: 45800 }],
+		[null, null, 29, { name: 'Orb of Storms', price: 48000 }],
+		[null, null, 30, { name: 'Boots of Teleportation', price: 49000 }],
+		[null, null, 31, { name: 'Bracers of Armor +7', price: 49000 }],
+		[null, null, 32, { name: 'Pearl of Power, 7th-level Spell', price: 49000 }],
+		[null, null, 33, { name: 'Amulet of Natural Armor +5', price: 50000 }],
+		[null, null, 34, { name: 'Cloak of Displacement, Major', price: 50000 }],
+		[null, null, 35, { name: 'Crystal Ball With See Invisibility', price: 50000 }],
+		[null, null, 36, { name: 'Horn of Valhalla', price: 50000 }],
+		[null, null, 37, { name: 'Crystal Ball With Detect Thoughts', price: 51000 }],
+		[null, null, 38, { name: 'Wings of Flying', price: 54000 }],
+		[null, null, 39, { name: 'Cloak of Etherealness', price: 55000 }],
+		[null, null, 40, { name: 'Instant Fortress', price: 55000 }],
+		[null, null, 41, { name: 'Manual of Bodily Health +2', price: 55000 }],
+		[null, null, 42, { name: 'Manual of Gainful Exercise +2', price: 55000 }],
+		[null, null, 43, { name: 'Manual of Quickness in Action +2', price: 55000 }],
+		[null, null, 44, { name: 'Tome of Clear Thought +2', price: 55000 }],
+		[null, null, 45, { name: 'Tome of Leadership And Influence +2', price: 55000 }],
+		[null, null, 46, { name: 'Tome of Understanding +2', price: 55000 }],
+		[null, null, 47, { name: 'Eyes of Charming', price: 56000 }],
+		[null, null, 48, { name: 'Robe of Stars', price: 58000 }],
+		[null, null, 49, { name: 'Carpet of Flying, 10 ft. By 10 ft.', price: 60000 }],
+		[null, null, 50, { name: 'Darkskull', price: 60000 }],
+		[null, null, 51, { name: 'Cube of Force', price: 62000 }],
+		[null, null, 52, { name: 'Belt of Physical Perfection +4', price: 64000 }],
+		[null, null, 53, { name: 'Bracers of Armor +8', price: 64000 }],
+		[null, null, 54, { name: 'Headband of Mental Superiority +4', price: 64000 }],
+		[null, null, 55, { name: 'Pearl of Power, 8th-level Spell', price: 64000 }],
+		[null, null, 56, { name: 'Crystal Ball With Telepathy', price: 70000 }],
+		[null, null, 57, { name: 'Horn of Blasting, Greater', price: 70000 }],
+		[null, null, 58, { name: 'Pearl of Power, Two Spells', price: 70000 }],
+		[null, null, 59, { name: 'Helm of Teleportation', price: 73500 }],
+		[null, null, 60, { name: 'Gem of Seeing', price: 75000 }],
+		[null, null, 61, { name: 'Robe of the Archmagi', price: 75000 }],
+		[null, null, 62, { name: 'Mantle of Faith', price: 76000 }],
+		[null, null, 63, { name: 'Amulet of Mighty Fists +4', price: 80000 }],
+		[null, null, 64, { name: 'Crystal Ball With True Seeing', price: 80000 }],
+		[null, null, 65, { name: 'Pearl of Power, 9th-level Spell', price: 81000 }],
+		[null, null, 66, { name: 'Well of Many Worlds', price: 82000 }],
+		[null, null, 67, { name: 'Manual of Bodily Health +3', price: 82500 }],
+		[null, null, 68, { name: 'Manual of Gainful Exercise +3', price: 82500 }],
+		[null, null, 69, { name: 'Manual of Quickness in Action +3', price: 82500 }],
+		[null, null, 70, { name: 'Tome of Clear Thought +3', price: 82500 }],
+		[null, null, 71, { name: 'Tome of Leadership And Influence +3', price: 82500 }],
+		[null, null, 72, { name: 'Tome of Understanding +3', price: 82500 }],
+		[null, null, 73, { name: 'Apparatus of the Crab', price: 90000 }],
+		[null, null, 74, { name: 'Belt of Physical Might +6', price: 90000 }],
+		[null, null, 75, { name: 'Headband of Mental Prowess +6', price: 90000 }],
+		[null, null, 76, { name: 'Mantle of Spell Resistance', price: 90000 }],
+		[null, null, 77, { name: 'Mirror of Opposition', price: 92000 }],
+		[null, null, 78, { name: 'Strand of Prayer Beads, Greater', price: 95800 }],
+		[null, null, 79, { name: 'Manual of Bodily Health +4', price: 110000 }],
+		[null, null, 80, { name: 'Manual of Gainful Exercise +4', price: 110000 }],
+		[null, null, 81, { name: 'Manual of Quickness in Action +4', price: 110000 }],
+		[null, null, 82, { name: 'Tome of Clear Thought +4', price: 110000 }],
+		[null, null, 83, { name: 'Tome of Leadership And Influence +4', price: 110000 }],
+		[null, null, 84, { name: 'Tome of Understanding +4', price: 110000 }],
+		[null, null, 85, { name: 'Amulet of the Planes', price: 120000 }],
+		[null, null, 86, { name: 'Robe of Eyes', price: 120000 }],
+		[null, null, 87, { name: 'Amulet of Mighty Fists +5', price: 125000 }],
+		[null, null, 88, { name: 'Helm of Brilliance', price: 125000 }],
+		[null, null, 89, { name: 'Manual of Bodily Health +5', price: 137500 }],
+		[null, null, 90, { name: 'Manual of Gainful Exercise +5', price: 137500 }],
+		[null, null, 91, { name: 'Manual of Quickness in Action +5', price: 137500 }],
+		[null, null, 92, { name: 'Tome of Clear Thought +5', price: 137500 }],
+		[null, null, 93, { name: 'Tome of Leadership And Influence +5', price: 137500 }],
+		[null, null, 94, { name: 'Tome of Understanding +5', price: 137500 }],
+		[null, null, 95, { name: 'Belt of Physical Perfection +6', price: 144000 }],
+		[null, null, 96, { name: 'Headband of Mental Superiority +6', price: 144000 }],
+		[null, null, 97, { name: 'Efreeti Bottle', price: 145000 }],
+		[null, null, 98, { name: 'Cubic Gate', price: 164000 }],
+		[null, null, 99, { name: 'Iron Flask', price: 170000 }],
+		[null, null, 100, { name: 'Mirror of Life Trapping', price: 200000 }]
+	    ]
+	},
+
+	'Advanced Player\'s Guide': {
+
+	    'Specific Armour': [
+		[null, 20, 02, { name: 'Mistmail', price: 2250, plus: 1 }],
+		[null, 35, 05, { name: 'Soothsayer\'s Raiment', price: 10300, plus: 1 }],
+		[null, 50, 06, { name: 'Boneless Leather', price: 12160, plus: 1 }],
+		[null, 65, 07, { name: 'Murderer\'s Blackcloth', price: 12405, plus: 1 }],
+		[null, 90, 12, { name: 'Folding Plate', price: 12650, plus: 1 }],
+		[null, 100, 27, { name: 'Armor of Insults', price: 16175, plus: 1 }],
+		[null, null, 42, { name: 'Buccaneer\'s Breastplate', price: 23850, plus: 1 }],
+		[null, null, 49, { name: 'Forsaken Banded Mail', price: 25400, plus: 1 }],
+		[null, null, 61, { name: 'Gianthide Armor (Ogre)', price: 39165, plus: 3 }],
+		[null, null, 71, { name: 'Gianthide Armor (Hill Giant)', price: 46665, plus: 3 }],
+		[null, null, 81, { name: 'Gianthide Armor (Stone Giant)', price: 54165, plus: 3 }],
+		[null, null, 86, { name: 'Gianthide Armor (Fire Giant)', price: 54165, plus: 3 }],
+		[null, null, 91, { name: 'Gianthide Armor (Frost Giant)', price: 54165, plus: 3 }],
+		[null, null, 96, { name: 'Gianthide Armor (Troll)', price: 59165, plus: 3 }],
+		[null, null, 97, { name: 'Gianthide Armor (Cloud Giant)', price: 69165, plus: 3 }],
+		[null, null, 98, { name: 'Gianthide Armor (Storm Giant)', price: 76665, plus: 3 }],
+		[null, null, 100, { name: 'Daystar Halfplate', price: 81250, plus: 1 }],
+	    ],
+
+	    'Specific Shield': [
+		[null, null, 50, { name: 'Battlement Shield', price: 16180, plus: 2 }],
+		[null, null, 100, { name: 'Fortress Shield', price: 19180, plus: 1 }]
+	    ],
+
+	    'Armour Qualities': [
+		[40, 35, 19, { name: 'Champion', plus: 1 }],
+		[80, 66, 37, { name: 'Dastard', plus: 1 }],
+		[99, 70, 39, { name: 'Jousting', price: 3750 }],
+		[null, 83, 61, { name: 'Righteous', price: 27000 }],
+		[null, 96, 80, { name: 'Unrighteous', price: 27000 }],
+		[null, 99, 90, { name: 'Determination', price: 30000 }],
+		[100, 100, 100, '@rollTwice']
+	    ],
+
+	    'Specific Weapons': [
+		[35, null, null, { name: 'Dustburst Bullet', price: 196, plus: 1, isAmmo: true }],
+		[70, null, null, { name: 'Tangle Bolt', price: 226, plus: 2, isAmmo: true }],
+		[80, 7, null, { name: 'Searing Arrow', price: 1516, plus: 2, isAmmo: true }],
+		[90, 14, null, { name: 'Sizzling Arrow', price: 1516, plus: 2, isAmmo: true }],
+		[100, 26, null, { name: 'Lance of Jousting', price: 4310, plus: 1 }],
+		[null, 41, null, { name: 'Boulderhead Mace', price: 6812, plus: 1 }],
+		[null, 53, null, { name: 'Beaststrike Club', price: 7300, plus: 1 }],
+		[null, 60, 04, { name: 'Trident of Stability', price: 9815, plus: 1 }],
+		[null, 70, 20, { name: 'Blade of Binding', price: 12350, plus: 1 }],
+		[null, 79, 37, { name: 'Shieldsplitter Lance', price: 18310, plus: 2 }],
+		[null, 87, 62, { name: 'Ricochet Hammer', price: 20301, plus: 2 }],
+		[null, 95, 82, { name: 'Sparkwake Starknife', price: 21324, plus: 2, isRanged: true }],
+		[null, 100, 88, { name: 'Undercutting Axe', price: 23310, plus: 2 }],
+		[null, null, 94, { name: 'Spirit Blade', price: 48502, plus: 4 }],
+		[null, null, 100, { name: 'Guarding Blade', price: 65310, plus: 5 }],
+	    ],
+
+	    'Melee Weapon Qualities': [
+		[12, 04, 03, { name: 'Allying', plus: 1 }],
+		[24, 12, 08, { name: 'Conductive', plus: 1 }],
+		[36, 22, 20, { name: 'Corrosive', plus: 1 }],
+		[48, 32, 29, { name: 'Cunning', plus: 1 }],
+		[58, 40, 38, { name: 'Furious', plus: 1 }],
+		[70, 49, 47, { name: 'Grayflame', plus: 1 }],
+		[77, 58, 56, { name: 'Huntsman', plus: 1 }],
+		[84, 67, 65, { name: 'Jurist', plus: 1 }],
+		[99, 74, 74, { name: 'Menacing', plus: 1 }],
+		[null, 82, 81, { name: 'Corrosive burst', plus: 2 }],
+		[null, 89, 85, { name: 'Dueling', price: 14000 }],
+		[null, 95, 90, { name: 'Transformative', price: 10000 }],
+		[100, 100, 100, '@rollTwice']
+	    ],
+
+	    'Ranged Weapon Qualities': [
+		[15, 14, 13, { name: 'Allying', plus: 1 }],
+		[30, 28, 26, { name: 'Conductive', plus: 1 }],
+		[48, 48, 42, { name: 'Corrosive', plus: 1 }],
+		[60, 58, 56, { name: 'Cunning', plus: 1 }],
+		[72, 69, 65, { name: 'Huntsman', plus: 1 }],
+		[94, 91, 87, { name: 'Jurist', plus: 1 }],
+		[99, 95, 90, { name: 'Corrosive burst', plus: 2 }],
+		[100, 100, 100, '@rollTwice']
+	    ],
+
+	    'Rings': [
+		[10, null, null, { name: 'Dungeon Ring, Prisoner\'s', price: 250 }],
+		[40, null, null, { name: 'Arcane Signets', price: 1000 }],
+		[80, 25, null, { name: 'Ring of Maniacal Devices', price: 5000 }],
+		[95, 46, null, { name: 'Ring of Delayed Doom (1 Stone)', price: 5000 }],
+		[100, 52, null, { name: 'Ring of Forcefangs', price: 8000 }],
+		[null, 59, null, { name: 'Ring of Revelation, Lesser', price: 10000 }],
+		[null, 70, 02, { name: 'Ring of Delayed Doom (2 Stones)', price: 10000 }],
+		[null, 80, 11, { name: 'Ring of Delayed Doom (3 Stones)', price: 15000 }],
+		[null, 85, 29, { name: 'Ring of Retribution', price: 15000 }],
+		[null, 90, 35, { name: 'Dungeon Ring, Jailer\'s', price: 16000 }],
+		[null, 96, 38, { name: 'Ring of Revelation, Greater', price: 16000 }],
+		[null, 98, 68, { name: 'Ring of Delayed Doom (4 Stones)', price: 20000 }],
+		[null, 99, 69, { name: 'Ring of Revelation, Superior', price: 24000 }],
+		[null, 100, 85, { name: 'Ring of Delayed Doom (5 Stones)', price: 25000 }],
+		[null, null, 93, { name: 'Ring of Delayed Doom (6 Stones)', price: 30000 }],
+		[null, null, 97, { name: 'Ring of Delayed Doom (7 Stones)', price: 35000 }],
+		[null, null, 99, { name: 'Ring of Delayed Doom (8 Stones)', price: 40000 }],
+		[null, null, 100, { name: 'Ring of Delayed Doom (9 Stones)', price: 45000 }],
+	    ],
+
+	    'Rods': [
+		[null, 03, null, { name: 'Metamagic Rod, Merciful, Lesser', price: 1500 }],
+		[null, 06, null, { name: 'Metamagic Rod, Disruptive, Lesser', price: 3000 }],
+		[null, 11, null, { name: 'Metamagic Rod, Ectoplasmic, Lesser', price: 3000 }],
+		[null, 21, null, { name: 'Metamagic Rod, Elemental, Lesser', price: 3000 }],
+		[null, 27, null, { name: 'Metamagic Rod, Focused, Lesser', price: 3000 }],
+		[null, 33, null, { name: 'Metamagic Rod, Intensified, Lesser', price: 3000 }],
+		[null, 36, null, { name: 'Metamagic Rod, Lingering, Lesser', price: 3000 }],
+		[null, 39, null, { name: 'Metamagic Rod, Persistent, Lesser', price: 3000 }],
+		[null, 43, null, { name: 'Metamagic Rod, Reach, Lesser', price: 3000 }],
+		[null, 53, null, { name: 'Metamagic Rod, Selective, Lesser', price: 3000 }],
+		[null, 55, null, { name: 'Metamagic Rod, Merciful', price: 5500 }],
+		[null, 58, null, { name: 'Metamagic Rod, Bouncing, Lesser', price: 9000 }],
+		[null, 62, null, { name: 'Metamagic Rod, Sickening, Lesser', price: 9000 }],
+		[null, 66, null, { name: 'Metamagic Rod, Thundering, Lesser', price: 9000 }],
+		[null, 70, 03, { name: 'Metamagic Rod, Disruptive', price: 11000 }],
+		[null, 74, 09, { name: 'Metamagic Rod, Ectoplasmic', price: 11000 }],
+		[null, 80, 20, { name: 'Metamagic Rod, Elemental', price: 11000 }],
+		[null, 83, 28, { name: 'Metamagic Rod, Focused', price: 11000 }],
+		[null, 86, 36, { name: 'Metamagic Rod, Intensified', price: 11000 }],
+		[null, 88, 39, { name: 'Metamagic Rod, Lingering', price: 11000 }],
+		[null, 90, 43, { name: 'Metamagic Rod, Persistent', price: 11000 }],
+		[null, 93, 46, { name: 'Metamagic Rod, Reach', price: 11000 }],
+		[null, 97, 54, { name: 'Metamagic Rod, Selective', price: 11000 }],
+		[null, 98, 56, { name: 'Metamagic Rod, Merciful, Greater', price: 12250 }],
+		[null, 100, 58, { name: 'Metamagic Rod, Dazing, Lesser', price: 14000 }],
+		[null, null, 60, { name: 'Metamagic Rod, Disruptive, Greater', price: 24500 }],
+		[null, null, 63, { name: 'Metamagic Rod, Ectoplasmic, Greater', price: 24500 }],
+		[null, null, 69, { name: 'Metamagic Rod, Elemental, Greater', price: 24500 }],
+		[null, null, 73, { name: 'Metamagic Rod, Focused, Greater', price: 24500 }],
+		[null, null, 77, { name: 'Metamagic Rod, Intensified, Greater', price: 24500 }],
+		[null, null, 79, { name: 'Metamagic Rod, Lingering, Greater', price: 24500 }],
+		[null, null, 80, { name: 'Metamagic Rod, Persistent, Greater', price: 24500 }],
+		[null, null, 82, { name: 'Metamagic Rod, Reach, Greater', price: 24500 }],
+		[null, null, 86, { name: 'Metamagic Rod, Selective, Greater', price: 24500 }],
+		[null, null, 89, { name: 'Metamagic Rod, Bouncing', price: 32500 }],
+		[null, null, 91, { name: 'Metamagic Rod, Sickening', price: 32500 }],
+		[null, null, 93, { name: 'Metamagic Rod, Thundering', price: 32500 }],
+		[null, null, 95, { name: 'Metamagic Rod, Dazing', price: 54000 }],
+		[null, null, 97, { name: 'Metamagic Rod, Bouncing, Greater', price: 73000 }],
+		[null, null, 98, { name: 'Metamagic Rod, Sickening, Greater', price: 73000 }],
+		[null, null, 99, { name: 'Metamagic Rod, Thundering, Greater', price: 73000 }],
+		[null, null, 100, { name: 'Metamagic Rod, Dazing, Greater', price: 121500 }],
+	    ],
+
+	    'Staves': [
+		[null, 02, 01, { name: 'Staff of Toxins', price: 12600 }],
+		[null, 05, 02, { name: 'Staff of Journeys', price: 13600 }],
+		[null, 10, 04, { name: 'Staff of Rigor', price: 13600 }],
+		[null, 18, 08, { name: 'Staff of Shrieking', price: 14400 }],
+		[null, 25, 11, { name: 'Staff of Souls', price: 16400 }],
+		[null, 35, 16, { name: 'Staff of Stealth', price: 18400 }],
+		[null, 42, 20, { name: 'Staff of Revelations', price: 20400 }],
+		[null, 54, 26, { name: 'Staff of Bolstering', price: 20800 }],
+		[null, 59, 28, { name: 'Staff of Traps', price: 21200 }],
+		[null, 69, 35, { name: 'Staff of Cackling Wrath', price: 23600 }],
+		[null, 76, 44, { name: 'Staff of Obstacles', price: 25800 }],
+		[null, 82, 54, { name: 'Staff of Performance', price: 26800 }],
+		[null, 86, 60, { name: 'Staff of Hoarding', price: 30016 }],
+		[null, 92, 72, { name: 'Staff of Slumber', price: 34050 }],
+		[null, 95, 83, { name: 'Staff of Vision', price: 41250 }],
+		[null, 98, 91, { name: 'Staff of Weather', price: 44200 }],
+		[null, 100, 100, { name: 'Staff of Many Rays', price: 52800 }],
+	    ],
+
+	    'Wondrous Items': [
+		[05, null, null, { name: 'Ioun Torch', price: 75 }],
+		[09, null, null, { name: 'War Paint of the Terrible Visage', price: 100 }],
+		[12, null, null, { name: 'Assisting Glove', price: 180 }],
+		[15, null, null, { name: 'Bandages of Rapid Recovery', price: 200 }],
+		[18, null, null, { name: 'Catching Cape', price: 200 }],
+		[20, null, null, { name: 'Soul Soap', price: 200 }],
+		[23, null, null, { name: 'Bottle of Messages', price: 300 }],
+		[27, null, null, { name: 'Key of Lock Jamming', price: 400 }],
+		[29, null, null, { name: 'Campfire Bead', price: 720 }],
+		[35, null, null, { name: 'Defoliant Polish', price: 800 }],
+		[39, null, null, { name: 'Dust of Emulation', price: 800 }],
+		[42, null, null, { name: 'Muleback Cords', price: 1000 }],
+		[45, null, null, { name: 'All Tools Vest', price: 1800 }],
+		[49, null, null, { name: 'Cowardly Crouching Cloak', price: 1800 }],
+		[56, null, null, { name: 'Scabbard of Vigor', price: 1800 }],
+		[58, null, null, { name: 'Clamor Box', price: 2000 }],
+		[61, null, null, { name: 'Glowing Glove', price: 2000 }],
+		[63, null, null, { name: 'Manacles of Cooperation', price: 2000 }],
+		[70, null, null, { name: 'Knight\'s Pennon (Honor)', price: 2200 }],
+		[75, null, null, { name: 'Flying Ointment', price: 2250 }],
+		[78, null, null, { name: 'Boots of Friendly Terrain', price: 2400 }],
+		[80, null, null, { name: 'Apple of Eternal Sleep', price: 2500 }],
+		[83, null, null, { name: 'Cauldron of Brewing', price: 3000 }],
+		[85, null, null, { name: 'Philter of Love', price: 3000 }],
+		[88, null, null, { name: 'Sash of the War Champion', price: 4000 }],
+		[90, null, null, { name: 'Knight\'s Pennon (Battle)', price: 4500 }],
+		[92, null, null, { name: 'Knight\'s Pennon (Parley)', price: 4500 }],
+		[94, null, null, { name: 'Helm of Fearsome Mien', price: 5000 }],
+		[96, null, null, { name: 'Horn of the Huntmaster', price: 5000 }],
+		[98, null, null, { name: 'Scabbard of Staunching', price: 5000 }],
+		[100, null, null, { name: 'Sheath of Bladestealth', price: 5000 }],
+		[null, 06, null, { name: 'Grappler\'s Mask', price: 5000 }],
+		[null, 16, null, { name: 'Torc of Lionheart Fury', price: 8000 }],
+		[null, 19, null, { name: 'Amulet of Spell Cunning', price: 10000 }],
+		[null, 23, null, { name: 'Construct Channel Brick', price: 10000 }],
+		[null, 25, null, { name: 'Doomharp', price: 10000 }],
+		[null, 27, null, { name: 'Ki Mat', price: 10000 }],
+		[null, 37, null, { name: 'Lord\'s Banner (Swiftness)', price: 10000 }],
+		[null, 40, null, { name: 'Crystal of Healing Hands', price: 12000 }],
+		[null, 44, null, { name: 'Book of the Loremaster', price: 15000 }],
+		[null, 48, null, { name: 'Bracelet of Mercy', price: 15000 }],
+		[null, 56, null, { name: 'Cauldron of Plenty', price: 15000 }],
+		[null, 61, null, { name: 'Gloves of Dueling', price: 15000 }],
+		[null, 64, null, { name: 'Necklace of Ki Serenity', price: 16000 }],
+		[null, 69, null, { name: 'Robes of Arcane Heritage', price: 16000 }],
+		[null, 74, null, { name: 'Silver Smite Bracelet', price: 16000 }],
+		[null, 82, null, { name: 'Vest of the Cockroach', price: 16000 }],
+		[null, 86, null, { name: 'Amulet of Magecraft', price: 20000 }],
+		[null, 90, null, { name: 'Horn of Antagonism', price: 20000 }],
+		[null, 93, null, { name: 'Moon Circlet', price: 20000 }],
+		[null, 96, null, { name: 'Necromancer\'s Athame', price: 20000 }],
+		[null, 98, null, { name: 'Sniper Goggles', price: 20000 }],
+		[null, 100, null, { name: 'Annihilation Spectacles', price: 25000 }],
+		[null, null, 08, { name: 'Cauldron of the Dead', price: 30000 }],
+		[null, null, 20, { name: 'Mask of Giants (Lesser)', price: 30000 }],
+		[null, null, 32, { name: 'Cauldron of Resurrection', price: 33000 }],
+		[null, null, 48, { name: 'Cauldron of Flying', price: 40000 }],
+		[null, null, 64, { name: 'Cauldron of seeing', price: 42000 }],
+		[null, null, 76, { name: 'Lord\'s Banner (Terror)', price: 56000 }],
+		[null, null, 88, { name: 'Lord\'s Banner (Victory)', price: 75000 }],
+		[null, null, 96, { name: 'Mask of Giants (Greater)', price: 90000 }],
+		[null, null, 100, { name: 'Lord\'s Banner (Crusades)', price: 100000 }],
+	    ]
+	}
+    },
+
+    chooseBookTable: function (itemType, column) {
+	var hits = 0;
+	var choice = null;
+	$.each(this.magicItemData, $.proxy(function (book) {
+	    // TODO check if we want to include that book
+	    var table = this.magicItemData[book][itemType];
+	    if (table) {
+		var row;
+		for (row = 0; row < table.length && table[row][column] == null; row++) {
+		}
+		if (row < table.length) {
+		    hits++;
+		    if (Math.random() * hits < 1.0) {
+			choice = book;
+		    }
+		}
+	    }
+	}, this));
+	if (!choice) {
+	    throw 'No book has items of type ' + itemType;
+	} else {
+	    return this.magicItemData[choice][itemType];
+	}
+    },
+
+    toMagicItem: function(tableRow) {
+	var classification = tableRow[0] ? 'Minor' : tableRow[1] ? 'Medium' : 'Major';
+	return new $.kingdom.MagicItem(classification, tableRow[3]);
+    },
+
+    chooseItem: function (column, itemType) {
+	if (column == 'minor') {
+	    column = 0;
+	} else if (column == 'medium') {
+	    column = 1;
+	} else if (column == 'major') {
+	    column = 2;
+	}
+	if (!itemType) {
+	    itemType = 'Start';
+	}
+	var table = this.chooseBookTable(itemType, column);
+	var roll = parseInt(100 * Math.random()) + 1;
+	var row = 0;
+	while (table[row][column] == null || table[row][column] < roll) {
+	    row++;
+	}
+	var result = table[row];
+	if ($.type(result[3]) != 'string') {
+	    return this.toMagicItem(result);
+	} else if (result[3].indexOf('@') == 0) {
+	    var func = this.itemFunctions[result[3]];
+	    return $.proxy(func, this)(column, itemType);
+	} else {
+	    return this.chooseItem(column, result[3]);
+	}
+    },
+
+    addArmourShieldQuality: function (column, table) {
+	var baseItem = this.chooseItem(column, table);
+	var itemType = baseItem.isShield ? 'Shield Qualities' : 'Armour Qualities';
+	return this.addQuality(column, itemType, 1000, baseItem);
+    },
+
+    addWeaponQuality: function (column, table) {
+	var baseItem = this.chooseItem(column, table);
+	if (baseItem.noQualities) {
+	    return baseItem;
+	}
+	if (baseItem.isAmmo) {
+	    baseItem.price *= 50;
+	    baseItem.isRanged = true;
+	} else if (baseItem.name.indexOf(' Random Weapon') >= 0) {
+	    if (Math.random() < 0.3) {
+		baseItem.name = baseItem.name.replace(' Weapon', ' Ranged Weapon');
+		baseItem.isRanged = true;
+	    } else {
+		baseItem.name = baseItem.name.replace(' Weapon', ' Melee Weapon');
+	    }
+	}
+	var itemType = baseItem.isRanged ? 'Ranged Weapon Qualities' : 'Melee Weapon Qualities';
+	var result = this.addQuality(column, itemType, 2000, baseItem);
+	if (baseItem.isAmmo) {
+	    result.price /= 50;
+	}
+	return result;
+    },
+
+    addQuality: function(column, itemType, plusFactor, baseItem) {
+	var quality = this.chooseItem(column, itemType);
+	while (quality.type && quality.type.intersect(baseItem.type)) {
+	    quality = this.chooseItem(column, itemType);
+	}
+	if (baseItem.plus == 0) {
+	    baseItem.name += ' +1';
+	    baseItem.plus = 1;
+	    baseItem.price += plusFactor;
+	}
+	if (quality.plus) {
+	    var plus = baseItem.plus + quality.plus;
+	    if (plus > 10) {
+		return baseItem;
+	    }
+	    baseItem.price += (plus*plus - baseItem.plus*baseItem.plus)*plusFactor;
+	    baseItem.plus = plus;
+	}
+	if (quality.price) {
+	    baseItem.price += quality.price;
+	}
+	baseItem.name = quality.name + ' ' + baseItem.name;
+	baseItem.type = (baseItem.type || '') + (quality.type || ('|' + quality.name + '|'));
+	if (baseItem.plus <= 2) {
+	    baseItem.classification = 'Minor'
+	} else if (baseItem.plus <= 4) {
+	    baseItem.classification = 'Medium'
+	} else {
+	    baseItem.classification = 'Major'
+	}
+	return baseItem;
+    },
+
+    rollTwice: function(column, table) {
+	var quality1 = this.chooseItem(column, table);
+	var quality2 = this.chooseItem(column, table);
+	while (quality1.type && quality1.type.intersect(quality2.type)) {
+	    if (quality2.plus > quality1.plus || quality2.price > quality1.price) {
+		quality1 = quality2;
+	    }
+	    quality2 = this.chooseItem(column, table);
+	}
+	if (quality2.plus) {
+	    quality1.plus = (quality1.plus || 0) + quality2.plus;
+	}
+	if (quality2.price) {
+	    quality1.price = (quality1.price || 0) + quality2.price;
+	}
+	quality1.name = quality2.name + ' ' + quality1.name;
+	quality1.type = (quality1.type || ('|' + quality1.name + '|')) + (quality2.type || ('|' + quality2.name + '|'));
+	return quality1;
+    }
+});
+
+$.kingdom.MagicItemSource.prototype.itemFunctions = {
+    '@rollTwice': $.kingdom.MagicItemSource.prototype.rollTwice,
+    '@addArmourShieldQuality': $.kingdom.MagicItemSource.prototype.addArmourShieldQuality,
+    '@addWeaponQuality': $.kingdom.MagicItemSource.prototype.addWeaponQuality
+};
 
 // ====================== Resource class ======================
 
