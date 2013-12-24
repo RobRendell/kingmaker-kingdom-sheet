@@ -3934,12 +3934,16 @@ $.kingdom.MagicItemSource = Class.create(
 	    // TODO check if we want to include that book
 	    var table = this.magicItemData[book][itemType];
 	    if (table) {
-		var row;
-		for (row = 0; row < table.length && table[row][column] == null; row++) {
+		// select book proportional to # of available items
+		var itemCount = 0;
+		for (var row = 0; row < table.length; row++) {
+		    if (table[row][column] != null) {
+			itemCount++;
+		    }
 		}
-		if (row < table.length) {
-		    hits++;
-		    if (Math.random() * hits < 1.0) {
+		if (itemCount > 0) {
+		    hits += itemCount;
+		    if (Math.random() * hits < itemCount) {
 			choice = book;
 		    }
 		}
