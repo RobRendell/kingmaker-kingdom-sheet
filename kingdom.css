@@ -26,6 +26,14 @@
     position: absolute;
 }
 
+#titleDiv {
+    display: none;
+    z-index: 10;
+    background-color: white;
+    position: absolute;
+    border: 1px solid black;
+}
+
 #importExportDiv textarea {
     margin: 2em;
     width: 90%;
@@ -247,6 +255,12 @@ img.buildingSite {
 
 .problem {
     color: red;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
 }
 
 .resources th:first-child {

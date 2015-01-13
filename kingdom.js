@@ -1,3 +1,9 @@
+// ====================== Utility functions ======================
+
+function isTouchDevice() {
+    return !!('ontouchstart' in window);
+}
+
 // ====================== Changes to global objects ======================
 var Class = {
     create: function (settings) {
@@ -2372,7 +2378,7 @@ $.kingdom.Building = Class.create({
             this.image = "images/" + name + ".png";
     },
 
-    toString: function () {
+    toString: function (htmlBreaks) {
         var result = this.name;
         if (this.getOnePerCity())
             result += "\nOnly one per city.";
@@ -2432,6 +2438,9 @@ $.kingdom.Building = Class.create({
             result += "\nSettlement Productivity " + this.getProductivity().plus() + ".";
         if (this.getSociety())
             result += "\nSettlement Society " + this.getSociety().plus() + ".";
+	if (htmlBreaks) {
+	    result = result.replace(/\n/g, '<br/>');
+	}
         return result;
     },
 
@@ -2766,7 +2775,9 @@ $.kingdom.District = Class.create({
                 return;
             lot = $("<img></img>").attr("src", building.image);
 	    lot.addClass('size' + building.getSize());
-            lot.attr("title", building.toString());
+	    if (!isTouchDevice()) {
+		lot.attr("title", building.toString());
+	    }
             if (building.getSize() == '2x1') {
                 if (this.buildings[index + 2] && !this.buildings[index + 2].image) {
                     lot.css({
@@ -3520,8 +3531,9 @@ $.kingdom.CityBuilder = Class.create({
             if (action) {
                 label = $('<a></a>').attr('href', '').html(label);
                 label.click($.proxy(action, this));
-            } else
+            } else {
                 label = $('<span></span>').html(label).addClass('problem');
+	    }
             row.append(label);
         }
         if (text) {
@@ -3578,6 +3590,9 @@ $.kingdom.CityBuilder = Class.create({
         this.openMenu(evt);
         var side = this.district.indexToSide(this.index);
         var existingName = this.district.buildings[this.index] && this.district.buildings[this.index].name;
+	if (existingName && isTouchDevice()) {
+	    this.addToMenu(null, null, existingName + '<hr/>');
+	}
         $.kingdom.Building.eachBuilding($.proxy(function (building) {
             if (building.getSize() == 'border' && building.name != existingName)
                 this.addBuildingToMenu(building);
@@ -3632,6 +3647,9 @@ $.kingdom.CityBuilder = Class.create({
     selectBuilding: function (evt) {
         this.openMenu(evt);
         var currBuilding = this.district.buildings[this.index];
+	if (isTouchDevice()) {
+	    this.addToMenu(null, null, currBuilding.toString(true) + '<hr/>');
+	}
 	if (currBuilding instanceof $.kingdom.Ruin) {
 	    var cost = parseInt(this.district.buildingCost(currBuilding.building)/2);
 	    var treasury = this.kingdom.getTreasury();
@@ -3695,8 +3713,9 @@ $.kingdom.CityBuilder = Class.create({
         this.menu.hide();
         $(this.target).removeClass("buildingSite");
         this.district = null;
-        if (evt)
+        if (evt) {
             evt.preventDefault();
+	}
     }
 
 });
@@ -4990,6 +5009,47 @@ $.kingdom.Calendar = Class.create({
     }
 
 });
+
+// ====================== Handle titles in touch devices ======================
+
+if (isTouchDevice()) {
+    $(document).on ('click', function(e) {
+	var titleDiv = $('#titleDiv');
+	if (titleDiv.is(':visible')) {
+	    titleDiv.hide();
+	    e.stopImmediatePropagation();
+	    e.preventDefault();
+	}
+    });
+    (function () {
+	// number of milliseconds for a long press
+    	var longpress = 500;
+	// holds the timeout id
+	var timeout;
+
+	$(document).on('mousedown', '[title]', function (e) {
+	    timeout = setTimeout($.proxy(function () {
+		timeout = null;
+		var titleDiv = $('#titleDiv');
+		var title = $(this).attr('title').replace(/\n/g, '<br/>');
+		titleDiv.html(title);
+		titleDiv.show();
+		titleDiv.css({ 'left': e.pageX - 20, 'top': e.pageY - 20 });
+	    }, this), longpress);
+	});
+
+	$(document).on('mouseleave', '[title]', function (e) {
+	    clearTimeout(timeout);
+	    timeout = null;
+	});
+
+	$(document).on('mouseup', '[title]', function (e) {
+	    clearTimeout(timeout);
+	    timeout = null;
+	});
+
+    }());
+}
 
 // ====================== Initialise! ======================
 
