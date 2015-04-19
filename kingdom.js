@@ -769,8 +769,10 @@ $.kingdom.Kingdom = Class.create({
         var farms = parseInt(this.getChoice("farms", 0));
         var farmsProduction = 2 * farms;
         var consumption = this.get("Consumption");
-        if (farmsProduction > consumption)
+        if (farmsProduction > consumption) {
+	    this.set("Consumption_Actual", "(" + (farmsProduction - consumption) + " farm production surplus)");
             farmsProduction = consumption;
+	}
         this.modify("Consumption", -farmsProduction, "Farms");
 
         this.limitsTable.refresh();
