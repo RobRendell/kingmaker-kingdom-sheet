@@ -3601,14 +3601,14 @@ $.kingdom.CityBuilder = Class.create({
         if (problem)
             this.addToMenu(label || building.name, null, problem, building.toString());
         else {
-            var activateFn;
-            if (action) {
-                activateFn = $.proxy(action, this, building);
-            } else {
-                activateFn = $.proxy(this.buildBuilding, this, building);
-            }
             if (cost === undefined) {
                 cost = this.district.buildingCost(building);
+            }
+            var activateFn;
+            if (action) {
+                activateFn = $.proxy(action, this, building, cost);
+            } else {
+                activateFn = $.proxy(this.buildBuilding, this, building, cost);
             }
             this.addToMenu(label || building.name, activateFn, cost + ' BP', building.toString());
         }
@@ -3657,10 +3657,9 @@ $.kingdom.CityBuilder = Class.create({
         this.district.clearBuilding(this.index);
     },
 
-    upgrade: function (building) {
+    upgrade: function (building, cost) {
         var existing = this.district.buildings[this.index];
         this.district.clearBuilding(this.index);
-        var cost = building.getCost() - existing.getCost();
         this.buildBuilding(building, cost);
     },
 
@@ -3699,9 +3698,9 @@ $.kingdom.CityBuilder = Class.create({
                 this.addToMenu('Demolish building', this.demolish);
             var upgradeArray = currBuilding.getUpgradeTo();
             if (upgradeArray) {
-                $.each(upgradeArray, $.proxy(function (index, upgrade) {
-                    var cost = upgrade.getCost() - currBuilding.getCost();
-                    this.addBuildingToMenu(upgrade, 'Upgrade to ' + upgrade.name, this.upgrade, cost);
+                $.each(upgradeArray, $.proxy(function (index, upgradeBuilding) {
+                    var cost = upgradeBuilding.getCost() - currBuilding.getCost();
+                    this.addBuildingToMenu(upgradeBuilding, 'Upgrade to ' + upgradeBuilding.name, this.upgrade, cost);
                 }, this));
             }
             if (currBuilding.getSize() == '2x1') {
@@ -3719,9 +3718,6 @@ $.kingdom.CityBuilder = Class.create({
     },
 
     buildBuilding: function (building, cost) {
-        if (cost === undefined) {
-            cost = this.district.buildingCost(building);
-        }
         this.kingdom.spendTreasury(cost);
         this.district.setBuilding(building, this.index);
         if (building.getUnrest()) {
