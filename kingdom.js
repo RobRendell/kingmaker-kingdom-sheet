@@ -1019,7 +1019,7 @@ $.kingdom.Kingdom = Class.create({
             },
             'Land': {
                 'size': 'border',
-                'borderColour': '#97974F',
+                'borderColour': 'tan',
                 'borderZ': 1,
                 'onlyEmpty': true,
                 'cost': 0
@@ -2672,6 +2672,14 @@ $.kingdom.Ruin = Class.create({
         return this.building.getSize();
     },
 
+    getIsHouse: function () {
+	return false;
+    },
+
+    getNoAdjacentHouses: function () {
+        return 0;
+    },
+
     toString: function () {
         return 'Ruined ' + this.building.name;
     }
@@ -3414,7 +3422,6 @@ $.kingdom.City = Class.create({
         this.fillItemSlotsOfType('major', this.majorItems);
         this.refreshItemSlots();
     },
-
 
     refreshStats: function () {
         var output = "";
@@ -4990,6 +4997,7 @@ $.kingdom.ResourceTable = Class.create({
     }
 
 });
+
 
 // ====================== Calendar class ======================
 
