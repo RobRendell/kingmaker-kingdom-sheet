@@ -529,6 +529,7 @@ $.kingdom.Kingdom = Class.create({
         this.peopleTable = new $.kingdom.PeopleTable(this);
         this.leaderTable = new $.kingdom.LeaderTable(this, this.peopleTable);
         this.resourceTable = new $.kingdom.ResourceTable(this);
+	this.armyTable = new $.kingdom.ArmyTable(this);
         // load appropriate rules
         this.houseRulesBuildings();
         // load cities
@@ -579,6 +580,7 @@ $.kingdom.Kingdom = Class.create({
     resetSheet: function () {
         this.peopleTable.resetSheet();
         this.resourceTable.resetSheet();
+        this.armyTable.resetSheet();
         this.cityNames = [];
         this.cities = {};
         $("#citiesDiv").empty();
@@ -801,6 +803,9 @@ $.kingdom.Kingdom = Class.create({
         this.promotions.apply();
         this.taxation.apply();
         this.festivals.apply();
+
+	// armies
+        this.armyTable.apply();
 
         // global factors
         this.apply();
@@ -5014,6 +5019,168 @@ $.kingdom.ResourceTable = Class.create({
     apply: function () {
         $.each(this.resources, $.proxy(function (index, resource) {
             resource.apply();
+        }, this));
+    }
+
+});
+
+// ====================== Army class ======================
+
+$.kingdom.Army = Class.create({
+
+    idPrefix: 'army.',
+
+    statList: ['ACR', 'DV', 'OM', 'Speed', 'Consumption', 'Active', 'Morale', 'Hitpoints', 'Notes'],
+
+    init: function (kingdom, index) {
+        this.kingdom = kingdom;
+        this.stats = {};
+        this.index = index;
+        this.name = this.kingdom.getChoice(this.getId('name'), '');
+        $.each(this.statList, $.proxy(function (index, name) {
+            this.stats[name] = this.kingdom.getChoice(this.getId(name), 0);
+        }, this));
+    },
+
+    getId: function (field) {
+        field = field || '';
+        return this.idPrefix + this.index + '.' + field;
+    },
+
+    setName: function (newName) {
+        this.kingdom.setChoice(this.getId('name'), newName);
+        this.name = newName;
+    },
+
+    setStat: function (statName, value) {
+        this.stats[statName] = value;
+        this.kingdom.setChoice(this.getId(statName), value);
+    },
+
+    getStat: function (statName) {
+        return this.stats[statName];
+    },
+
+    apply: function () {
+	var consumption = parseInt(this.stats['Consumption']) || 0;
+	if (this.stats['Active'])
+	    consumption *= 4;
+        this.kingdom.modify("Consumption", consumption, "Armies");
+    },
+
+    renumber: function (newIndex) {
+        var oldId = this.getId('');
+        if (newIndex >= 0) {
+            this.index = newIndex;
+            this.kingdom.changeId(oldId, this.getId(''));
+        } else
+            this.kingdom.changeId(oldId, '', true);
+    }
+
+});
+
+
+// ====================== ArmyTable class ======================
+
+$.kingdom.ArmyTable = Class.create({
+    armyCountId: 'armyCount',
+
+    init: function (kingdom) {
+        this.kingdom = kingdom;
+        this.armies = [];
+        this.armiesTable = $('.armies tbody');
+        this.armiesTable.empty();
+        // load anything stored in kingdom
+        var max = parseInt(this.kingdom.getChoice(this.armyCountId, 0));
+        var index;
+        for (index = 0; index < max; ++index)
+            this.addArmy(index);
+        $('#addArmyButton').click($.proxy(this.addArmyHandler, this));
+    },
+
+    resetSheet: function () {
+        this.armies = [];
+        this.armiesTable.empty();
+    },
+
+    addArmyHandler: function (evt) {
+        this.addArmy(this.armies.length, true);
+    },
+
+    addCheckboxCell: function (row, value, changeCallback) {
+        var cell = $('<td></td>');
+	var checkbox = $('<input type="checkbox"/>');
+	cell.append(checkbox);
+	checkbox.prop('checked', value);
+	checkbox.change(changeCallback);
+        row.append(cell);
+        return cell;
+    },
+
+    addCell: function (row, text, editCallback) {
+        var cell = $('<td></td>');
+        if (text)
+            cell.text(text);
+        cell.makeEditable(editCallback);
+        row.append(cell);
+        return cell;
+    },
+
+    addArmy: function (index, editNameImmediately) {
+        var army = new $.kingdom.Army(this.kingdom, index);
+        this.armies.push(army);
+        var newRow = $('<tr></tr>');
+        var nameCell = this.addCell(newRow, army.name, $.proxy(this.finishEditingName, this));
+        $.each(army.statList, $.proxy(function (index, stat) {
+	    if (stat == 'Active') {
+		this.addCheckboxCell(newRow, army.getStat(stat), $.proxy(this.garrisonedChanged, this));
+	    } else {
+		this.addCell(newRow, army.getStat(stat), $.proxy(this.finishEditingStat, this, stat));
+	    }
+        }, this));
+        this.armiesTable.append(newRow);
+        this.kingdom.setChoice(this.armyCountId, this.armies.length);
+        if (editNameImmediately)
+            nameCell.click();
+    },
+
+    finishEditingName: function (element, newValue, oldValue) {
+        newValue = newValue.trim();
+        var index = $(element).parent().index();
+        if (!newValue && oldValue) {
+            var answer = confirm("Really delete army \"" + oldValue + "\"?");
+            if (!answer) {
+                element.text(oldValue);
+                return;
+            }
+        }
+        if (!newValue) {
+            $(element).parent().remove();
+            this.armies[index].renumber(-1);
+            for (++index; index < this.armies.length; ++index) {
+                this.armies[index].renumber(index - 1);
+                this.armies[index - 1] = this.armies[index];
+            }
+            this.armies.splice(this.armies.length - 1, 1);
+            this.kingdom.setChoice(this.armyCountId, this.armies.length);
+        } else
+            this.armies[index].setName(newValue);
+    },
+
+    finishEditingStat: function (stat, element, newValue) {
+        var index = $(element).parent().index();
+        this.armies[index].setStat(stat, newValue);
+    },
+
+    garrisonedChanged: function (evt) {
+	var checkbox = $(evt.target);
+        var index = checkbox.parent().parent().index();
+        this.armies[index].setStat('Active', checkbox.prop('checked'));
+    },
+
+    apply: function () {
+        $.each(this.armies, $.proxy(function (index, army) {
+            army.apply();
         }, this));
     }
 
