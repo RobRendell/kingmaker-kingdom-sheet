@@ -548,6 +548,12 @@ $.kingdom.Kingdom = Class.create({
                 city.fillItemSlots();
             }, this));
         }, this));
+        $('#emptyItemSlots').click($.proxy(function () {
+            $.each(this.cities, $.proxy(function (cityName) {
+                var city = this.cities[cityName];
+                city.emptyCheapItemSlots();
+            }, this));
+        }, this));
         $('#addCityButton').click($.proxy(function () {
             new $.kingdom.City(this);
         }, this));
@@ -3420,6 +3426,21 @@ $.kingdom.City = Class.create({
         this.fillItemSlotsOfType('minor', this.minorItems);
         this.fillItemSlotsOfType('medium', this.mediumItems);
         this.fillItemSlotsOfType('major', this.majorItems);
+        this.refreshItemSlots();
+    },
+
+    emptyCheapItemSlotsOfType: function (type, number) {
+        for (var slot = 0; slot < number; slot++) {
+            if (this.itemSlots[type][slot] && this.itemSlots[type][slot].price < 4000) {
+                this.itemSlots[type][slot] = null;
+            }
+        }
+    },
+
+    emptyCheapItemSlots: function () {
+        this.emptyCheapItemSlotsOfType('minor', this.minorItems);
+        this.emptyCheapItemSlotsOfType('medium', this.mediumItems);
+        this.emptyCheapItemSlotsOfType('major', this.majorItems);
         this.refreshItemSlots();
     },
 
