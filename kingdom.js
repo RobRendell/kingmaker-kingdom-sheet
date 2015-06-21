@@ -5030,7 +5030,7 @@ $.kingdom.Army = Class.create({
 
     idPrefix: 'army.',
 
-    statList: ['ACR', 'DV', 'OM', 'Speed', 'Consumption', 'Active', 'Morale', 'Hitpoints', 'Notes'],
+    statList: ['Creatures', 'Size', 'ACR', 'DV', 'OM', 'Speed', 'Consumption', 'Active', 'Morale', 'Hitpoints', 'Notes'],
 
     init: function (kingdom, index) {
         this.kingdom = kingdom;
@@ -5063,7 +5063,7 @@ $.kingdom.Army = Class.create({
 
     apply: function () {
 	var consumption = parseInt(this.stats['Consumption']) || 0;
-	if (this.stats['Active'])
+	if (this.stats['Active'] == "true")
 	    consumption *= 4;
         this.kingdom.modify("Consumption", consumption, "Armies");
     },
@@ -5111,8 +5111,25 @@ $.kingdom.ArmyTable = Class.create({
         var cell = $('<td></td>');
 	var checkbox = $('<input type="checkbox"/>');
 	cell.append(checkbox);
-	checkbox.prop('checked', value);
+	checkbox.prop('checked', value == "true");
 	checkbox.change(changeCallback);
+        row.append(cell);
+        return cell;
+    },
+
+    addSelectCell: function (row, text, options, editCallback) {
+        var cell = $('<td></td>');
+	var select = $('<select></select>');
+	$.each(options, function (index, value) {
+	    var option = $('<option></option>');
+	    option.text(value);
+	    if (value == text) {
+		option.prop('selected', true);
+	    }
+	    select.append(option);
+	});
+	select.change(editCallback);
+	cell.append(select);
         row.append(cell);
         return cell;
     },
@@ -5133,7 +5150,9 @@ $.kingdom.ArmyTable = Class.create({
         var nameCell = this.addCell(newRow, army.name, $.proxy(this.finishEditingName, this));
         $.each(army.statList, $.proxy(function (index, stat) {
 	    if (stat == 'Active') {
-		this.addCheckboxCell(newRow, army.getStat(stat), $.proxy(this.garrisonedChanged, this));
+		this.addCheckboxCell(newRow, army.getStat(stat), $.proxy(this.finishEditingActive, this));
+	    } else if (stat == 'Size') {
+		this.addSelectCell(newRow, army.getStat(stat), [ 'Fine', 'Diminutive', 'Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan', 'Colossal' ], $.proxy(this.finishEditingSize, this));
 	    } else {
 		this.addCell(newRow, army.getStat(stat), $.proxy(this.finishEditingStat, this, stat));
 	    }
@@ -5172,10 +5191,16 @@ $.kingdom.ArmyTable = Class.create({
         this.armies[index].setStat(stat, newValue);
     },
 
-    garrisonedChanged: function (evt) {
+    finishEditingSize: function (evt) {
+	var element = $(evt.target);
+        var index = element.parent().parent().index();
+        this.armies[index].setStat('Size', element.val());
+    },
+
+    finishEditingActive: function (evt) {
 	var checkbox = $(evt.target);
         var index = checkbox.parent().parent().index();
-        this.armies[index].setStat('Active', checkbox.prop('checked'));
+        this.armies[index].setStat('Active', checkbox.prop('checked') ? "true" : "false");
     },
 
     apply: function () {
