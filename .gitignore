@@ -1,2 +1,4 @@
 notes.txt
 *.swp
+*.iml
+.idea
