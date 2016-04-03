@@ -417,12 +417,16 @@
 				<li>Advance calendar month: <span class="calendar">Calendar</span><button class="calendarMinus">-</button><button class="calendarPlus">+</button></li>
 				<li>Upkeep Phase
 					<ol type="a">
-						<li>Determine Kingdom Stability</li>
-						<li>Pay Consumption</li>
-						<li>Fill Vacant Magic Item Slots
-							<input type="button" value="Fill all vacant item slots" id="fillItemSlots" />
+						<li><input type="button" value="Determine Kingdom Stability" id="turnStabilityCheck" />
+							<div id="turnStabilityOutput" class="output"></div>
 						</li>
-						<li>Deal With Unrest</li>
+						<li><input type="button" value="Pay Consumption" id="payConsumptionButton" />
+							<div id="payConsumptionOutput" class="output"></div>
+						</li>
+						<li><input type="button" value="Fill Vacant Magic Item Slots" id="fillItemSlots" />
+							<div id="fillItemSlotsOutput" class="output"></div>
+						</li>
+						<li>Deal With Unrest (if unrest is 11 or higher).</li>
 					</ol>
 				</li>
 				<li>Improvement Phase
@@ -435,7 +439,7 @@
 								Improvements for every district (comma-separated list of building names): <input type="text" name="improveCitiesBuildings" size="60" /><br/>
 								Keep treasury above: <input type="text" name="improveCitiesTreasuryLimit" size="4"/> BPs<br/>
 								Keep Loyalty and Stability ahead of Command DC by: <input type="text" name="improveCitiesMargin" size="4"/><br/>
-								Building limit: <span class="fromKingdom limitBuildingsCurrent"></span> buildings <span class="fromKingdom extraHouse"></span><br/>
+								Building limit: <span class="fromKingdom limitBuildingsCurrent"></span> <span class="fromKingdom extraHouse"></span><br/>
 								<input type="button" value="Improve cities" id="improveCitiesButton" />
 								<div id="improveCitiesOutput" class="output"></div>
 							</div>
@@ -449,10 +453,12 @@
 						<li>Withdrawals</li>
 						<li>Sell Valuable Items
 							<input type="button" value="Empty item slots with cheap items" id="emptyItemSlots" />
-							<input type="button" value="Sell most valuable items" id="sellItemSlots" />
+							<input type="button" value="Sell most valuable magic items" id="sellItemSlots" />
 							<div id="valuableItemOutput" class="output"></div>
 						</li>
-						<li>Generate Income</li>
+						<li><input type="button" value="Generate Income" id="generateIncomeButton" />
+							<div id="generateIncomeOutput" class="output"></div>
+						</li>
 					</ol>
 				</li>
 				<li>Event Phase</li>

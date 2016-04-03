@@ -289,3 +289,7 @@ img.buildingSite {
 .output:empty {
     display: none;
 }
+
+ol li {
+    margin: 1em 0;
+}

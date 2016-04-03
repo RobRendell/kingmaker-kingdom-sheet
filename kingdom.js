@@ -59,6 +59,16 @@ Number.prototype.numberRange = function () {
     return result;
 };
 
+Number.prototype.roll = function (dc) {
+    var roll = parseInt(Math.random()*20) + 1;
+    var delta = this + roll - dc;
+    if (roll == 1) {
+        return { pass: false, delta: delta, text: 'rolled natural 1.' };
+    } else {
+        return { pass: (delta >= 0), delta: delta, text: `rolled ${roll} for total ${this + roll} vs DC ${dc}.` };
+    }
+}
+
 Array.prototype.joinAnd = function () {
     if (this.length <= 1)
         return this.join("");
@@ -561,11 +571,40 @@ $.kingdom.Kingdom = Class.create({
         this.renderCities();
         this.cityBuilder = new $.kingdom.CityBuilder(this);
         // Handle buttons
+        $('#turnStabilityCheck').click($.proxy(function () {
+            var check = parseInt(this.get('Stability')).roll(parseInt(this.get('ControlDC')));
+            var unrest = parseInt(this.getChoice('unrest', 0));
+            if (check.pass) {
+                if (unrest > 0) {
+                    $('#turnStabilityOutput').append($('<div/>').text('Passed Stability check, ' + check.text + '  Reducing unrest by 1.'));
+                    this.setChoice('unrest', unrest - 1);
+                } else {
+                    $('#turnStabilityOutput').append($('<div/>').text('Passed Stability check, ' + check.text + '  Unrest is zero, gaining 1 BP.'));
+                    this.spendTreasury(-1);
+                }
+            } else if (check.delta <= -5) {
+                    $('#turnStabilityOutput').append($('<div/>').text('Failed Stability check by 5 or more, ' + check.text + '  Increasing unrest by 2!').addClass('problem'));
+                    this.setChoice('unrest', unrest + 2);
+            } else {
+                    $('#turnStabilityOutput').append($('<div/>').text('Failed Stability check, ' + check.text).addClass('problem'));
+            }
+        }, this));
+        $('#payConsumptionButton').click($.proxy(function () {
+            var consumption = parseInt(this.get('Consumption'));
+            if (consumption > 0) {
+                this.spendTreasury(consumption);
+                $('#payConsumptionOutput').append($('<div/>').text('Paid consumption of ' + consumption + ', reducing treasury to ' + this.getTreasury() + ' BPs.'));
+                if (this.getTreasury() < 0) {
+                    $('#payConsumptionOutput').append($('<div/>').text('Treasury is in the negatives - increasing unrest by 2!').addClass('problem'));
+                    var unrest = parseInt(this.getChoice('unrest', 0));
+                    this.setChoice('unrest', unrest + 2);
+                }
+            } else {
+                $('#payConsumptionOutput').append($('<div/>').text('No consumption to be paid.'));
+            }
+        }, this));
         $('#fillItemSlots').click($.proxy(function () {
-            $.each(this.cities, $.proxy(function (cityName) {
-                var city = this.cities[cityName];
-                city.fillItemSlots();
-            }, this));
+            this.fillMagicItemSlots();
         }, this));
         $('#improveCitiesButton').click($.proxy(function () {
             var buildings = this.getChoice('improveCitiesBuildings');
@@ -590,6 +629,17 @@ $.kingdom.Kingdom = Class.create({
             slotsLeft = this.sellItemSlots('minor', slotsLeft, $('#valuableItemOutput'));
             if (slotsLeft == numDistricts) {
                 $('#valuableItemOutput').append($('<div/>').text('No items to sell.'));
+            }
+        }, this));
+        $('#generateIncomeButton').click($.proxy(function () {
+            var dc = parseInt(this.get('ControlDC'));
+            var check = parseInt(this.get('Economy')).roll(dc);
+            if (check.pass) {
+                var amount = Math.floor((dc + check.delta)/5);
+                $('#generateIncomeOutput').append($('<div/>').text('Economy check passed, ' + check.text + '  Generated ' + amount + ' BPs.'));
+                this.spendTreasury(-amount);
+            } else {
+                $('#generateIncomeOutput').append($('<div/>').text('Economy check failed, ' + check.text).addClass('problem'));
             }
         }, this));
         $('#addCityButton').click($.proxy(function () {
@@ -627,6 +677,7 @@ $.kingdom.Kingdom = Class.create({
         this.cityNames = [];
         this.cities = {};
         $("#citiesDiv").empty();
+        $('.output').text('');
     },
 
     get: function (field, defaultValue) {
@@ -827,7 +878,12 @@ $.kingdom.Kingdom = Class.create({
         this.modify("Consumption", -farmsProduction, "Farms");
 
         this.limitsTable.refresh();
-        this.set('limitBuildingsCurrent', parseInt(this.get('limitBuildings')) - parseInt(this.getChoice('buildsThisTurn')));
+        if (this.get('limitBuildings') == 'no limit') {
+            this.set('limitBuildingsCurrent', 'no limit');
+        } else {
+            var remaining = parseInt(this.get('limitBuildings')) - parseInt(this.getChoice('buildsThisTurn'));
+            this.set('limitBuildingsCurrent', remaining + ' building' + (remaining > 1 ? 's' : ''));
+        }
         this.setExtraHouse();
 
     },
@@ -911,6 +967,25 @@ $.kingdom.Kingdom = Class.create({
         });
     },
 
+    fillMagicItemSlots: function () {
+        var totals = {};
+        $.each(this.cities, $.proxy(function (cityName) {
+            var city = this.cities[cityName];
+            city.fillItemSlots(totals);
+        }, this));
+        var result = [];
+        this.pushItemTypeTotal(result, totals.Major, 'major');
+        this.pushItemTypeTotal(result, totals.Medium, 'medium');
+        this.pushItemTypeTotal(result, totals.Minor, 'minor');
+        $('#fillItemSlotsOutput').append($('<div/>').text('Added ' + result.joinAnd() + '.'));
+    },
+
+    pushItemTypeTotal: function (list, number, type) {
+        if (number) {
+            list.push(number + ' ' + type + ' item' + (number > 1 ? 's' : ''));
+        }
+    },
+
     sellItemSlots: function (type, count, element) {
         // Find all slots containing items of the given type (starting with the highest slots)
         var citiesAndSlots = [];
@@ -928,19 +1003,16 @@ $.kingdom.Kingdom = Class.create({
             var slot = citiesAndSlots[index].slot;
             var itemTypeIndex = itemTypes.indexOf(itemType);
             var dc = itemSellDCs[itemTypeIndex];
-            var roll = parseInt(Math.random()*20) + 1;
-            var total = (roll > 1) ? roll + this.get('Economy') : 0;
-            if (total >= dc) {
+            var check = parseInt(this.get('Economy')).roll(dc);
+            if (check.pass) {
                 var bp = itemSellBPs[itemTypeIndex];
                 this.spendTreasury(-bp);
-                element.append($('<div/>').text(`Successfully sold ${type} item "${city.itemSlots[slotType][slot].name}" in ${city.name} for ${bp} BPs, rolled ${roll} for total ${total} vs DC ${dc}.`).addClass('successfulSale'));
+                element.append($('<div/>').text(`Successfully sold ${type} item "${city.itemSlots[slotType][slot].name}" in ${city.name} for ${bp} BPs, ${check.text}`).addClass('successfulSale'));
                 city.itemSlots[slotType][slot] = null;
                 city.refreshItemSlots();
                 city.save();
-            } else if (roll == 1) {
-                element.append($('<div/>').text(`Failed to sell ${type} item "${city.itemSlots[slotType][slot].name}" in ${city.name}, rolled natural 1.`).addClass('problem'));
             } else {
-                element.append($('<div/>').text(`Failed to sell ${type} item "${city.itemSlots[slotType][slot].name}" in ${city.name}, rolled ${roll} for total ${total} vs DC ${dc}.`).addClass('problem'));
+                element.append($('<div/>').text(`Failed to sell ${type} item "${city.itemSlots[slotType][slot].name}" in ${city.name}, ${check.text}`).addClass('problem'));
             }
         }
         return count;
@@ -950,19 +1022,40 @@ $.kingdom.Kingdom = Class.create({
         var buildingNames = buildingsString.split(/, */);
         var buildings = [];
         for (var index = 0; index < buildingNames.length; ++index) {
-            var name = buildingNames[index].toTitleCase();
-            if ($.kingdom.Building.buildingData[name]) {
+            var name = buildingNames[index].toTitleCase().trim();
+            if (!name) {
+                // Ignore if they enter nothing
+            } else if ($.kingdom.Building.buildingData[name]) {
                 buildings.push($.kingdom.Building.get(name));
             } else {
                 $('#improveCitiesOutput').append($('<div/>').text('Building name "' + name + '" unknown - skipping.').addClass('problem'));
             }
         }
-        var buildingLimit = parseInt(this.get('limitBuildings')) - parseInt(this.getChoice('buildsThisTurn'));
+        var limitBuildings = this.get('limitBuildings')
+        var buildingLimit;
+        if (limitBuildings == 'no limit') {
+            buildingLimit = Number.POSITIVE_INFINITY;
+        } else {
+            buildingLimit = parseInt(limitBuildings) - parseInt(this.getChoice('buildsThisTurn'));
+        }
         var cityNames = Object.keys(this.cities);
         var extraHouse = this.getChoice('extraHouse');
         var userBuildings = true;
         var goal;
+        if (buildings.length > 0) {
+            $('#improveCitiesOutput').append($('<div/>').text("--- Goal: build from user's list."));
+        } else {
+            userBuildings = false;
+        }
         while (buildingLimit > 0 && this.getTreasury() > treasuryLimit && cityNames.length > 0) {
+            if (!userBuildings) {
+                var newGoal = this.determineImproveCitiesGoal();
+                if (newGoal != goal) {
+                    goal = newGoal;
+                    buildings = this.getBuildingsForGoal(goal);
+                    $('#improveCitiesOutput').append($('<div/>').text('--- New goal: ' + goal));
+                }
+            }
             var cityIndex = parseInt(Math.random() * cityNames.length)
             var city = this.cities[cityNames[cityIndex]];
             var numBuilt = city.automatedImprovement(buildings, treasuryLimit, buildingLimit, extraHouse, !userBuildings);
@@ -978,13 +1071,6 @@ $.kingdom.Kingdom = Class.create({
                 userBuildings = false;
                 cityNames = Object.keys(this.cities);
             }
-            if (!userBuildings) {
-                var newGoal = this.determineImproveCitiesGoal();
-                if (newGoal != goal) {
-                    goal = newGoal;
-                    buildings = this.getBuildingsForGoal(goal);
-                }
-            }
         }
         this.setChoice('buildsThisTurn', parseInt(this.get('limitBuildings')) - buildingLimit);
         this.setExtraHouse(extraHouse);
@@ -992,9 +1078,13 @@ $.kingdom.Kingdom = Class.create({
     },
 
     determineImproveCitiesGoal: function () {
+        var unrest = parseInt(this.getChoice('unrest'));
+        if (unrest > 2) {
+            return 'Unrest';
+        }
         var target = parseInt(this.get('ControlDC')) + parseInt(this.getChoice('improveCitiesMargin'));
-        var loyalty = this.get('Loyalty');
-        var stability = this.get('Stability');
+        var loyalty = parseInt(this.get('Loyalty'));
+        var stability = parseInt(this.get('Stability'));
         if (loyalty < target) {
             if (stability < target) {
                 return (loyalty < stability) ? 'Loyalty' : 'Stability';
@@ -1015,7 +1105,8 @@ $.kingdom.Kingdom = Class.create({
         if (!this.goalBuildings[goal]) {
             this.goalBuildings[goal] = [];
             $.kingdom.Building.eachBuilding($.proxy(function (building) {
-                if (building.getSize() != '1x1' || !building.getData()[goal]) {
+                if (building.getSize() != '1x1' || !building.getData()[goal] ||
+                        (goal == 'Unrest' && building.getUnrest() > 0)) {
                     return;
                 }
                 var cost = building.getCost();
@@ -3392,7 +3483,7 @@ $.kingdom.District = Class.create({
                 for (var lot = (building.getSize() == 'border') ? borderStart : 0; lot < end; ++lot) {
                     if ((lot < borderStart && this.buildings[lot]) ||
                             (lot >= borderStart && this.buildings[lot] !== landBorder) ||
-                            (building.getAdjacentWater() && !this.isAdjacentToWater(lot))) {
+                            (building.getAdjacentWater() && !this.isAdjacentToWater(lot, building))) {
                         continue;
                     }
                     var occupiedLots = this.countOccupiedLots(lot);
@@ -3401,7 +3492,7 @@ $.kingdom.District = Class.create({
                     if (building.getAdjacentHouses() > 0) {
                         var extraHouseCount = building.getAdjacentHouses() - adjacentHouses;
                         if (extraHouseCount > 0) {
-                            if (extraHouseCount > 3 - occupiedLots ||
+                            if (extraHouseCount > 3 - occupiedLots || this.noHousesAllowedCheck(lot) ||
                                     extraHouseCount + 1 > buildingLimit + (extraHouse ? 1 : 0) ||
                                     (remainingTreasury - this.buildingCost(house)*extraHouseCount < treasuryLimit)) {
                                 continue;
@@ -3411,7 +3502,7 @@ $.kingdom.District = Class.create({
                     } else if (adjacentHouses > 0) {
                         continue;
                     }
-                    if (lot < borderStart && this.isAdjacentToWater(lot) && !building.getAdjacentWater()) {
+                    if (lot < borderStart && this.isAdjacentToWater(lot, building) && !building.getAdjacentWater()) {
                         byWater = this.lotWithFewestAdditionalHouses(byWater, lot, additionalHouses, reservoirHits);
                     } else if (lot < borderStart && occupiedLots == 0) {
                         newLot = this.lotWithFewestAdditionalHouses(newLot, lot, additionalHouses, reservoirHits);
@@ -3727,18 +3818,24 @@ $.kingdom.City = Class.create({
         }, this));
     },
 
-    fillItemSlotsOfType: function (type, number) {
+    fillItemSlotsOfType: function (type, number, totals) {
         for (var slot = 0; slot < number; slot++) {
             if (this.itemSlots[type][slot] == null) {
-                this.itemSlots[type][slot] = this.kingdom.magicItemSource.chooseItem(type);
+                var item = this.kingdom.magicItemSource.chooseItem(type);
+                this.itemSlots[type][slot] = item;
+                if (!totals[item.classification]) {
+                    totals[item.classification] = 1;
+                } else {
+                    totals[item.classification]++;
+                }
             }
         }
     },
 
-    fillItemSlots: function () {
-        this.fillItemSlotsOfType('minor', this.minorItems);
-        this.fillItemSlotsOfType('medium', this.mediumItems);
-        this.fillItemSlotsOfType('major', this.majorItems);
+    fillItemSlots: function (totals) {
+        this.fillItemSlotsOfType('minor', this.minorItems, totals);
+        this.fillItemSlotsOfType('medium', this.mediumItems, totals);
+        this.fillItemSlotsOfType('major', this.majorItems, totals);
         this.refreshItemSlots();
     },
 
@@ -3779,8 +3876,10 @@ $.kingdom.City = Class.create({
     },
 
     automatedImprovement: function (buildings, treasuryLimit, buildingLimit, extraHouse, allowDuplicate) {
-        for (var index = 0; index < this.districts.length; ++index) {
-            var district = this.districts[index];
+        var districtShuffle = (this.districts.length - 1).numberRange();
+        districtShuffle.shuffle();
+        for (var index = 0; index < districtShuffle.length; ++index) {
+            var district = this.districts[districtShuffle[index]];
             var numBuilt = district.automatedImprovementFromList(buildings, treasuryLimit, buildingLimit, extraHouse, allowDuplicate);
             if (numBuilt > 0) {
                 return numBuilt;
