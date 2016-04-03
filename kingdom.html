@@ -25,7 +25,7 @@
     </div>
     <div id="titleDiv"></div>
 
-    <span class="calendar"><span id="calendar">Calendar</span><button id="calendarMinus">-</button><button id="calendarPlus">+</button></span>
+    <span class="topCalendar"><span class="calendar">Calendar</span><button class="calendarMinus">-</button><button class="calendarPlus">+</button></span>
 
     <div class="hiddenPanel" id="houseRulesDiv">
 	<h3>Configure the house rules that apply to this kingdom</h3>
@@ -45,7 +45,7 @@
 	<button id="houseRulesClose">Close</button>
     </div>
 
-    <h1><span id="kingdomType">Barony</span> of <span id="kingdomName"></span><h1>
+    <h1><span id="kingdomType">Barony</span> of <span id="kingdomName"></span></h1>
 
     <div class="summary">
 
@@ -340,9 +340,6 @@
 
     <div>
 
-	<input type="button" value="Fill all vacant item slots" id="fillItemSlots" />
-	<input type="button" value="Empty item slots with cheap items" id="emptyItemSlots" />
-
 	<div id="citiesDiv"></div>
 
 	<div id="buildSelect"></div>
@@ -412,6 +409,54 @@
 	<input type="button" value="Add Army" id="addArmyButton" />
 
     </div>
+
+	<h1>Kingdom Turn <span class="expando">[+]</span></h1>
+	<div>
+		<div class="RRR">
+			<ol start="0">
+				<li>Advance calendar month: <span class="calendar">Calendar</span><button class="calendarMinus">-</button><button class="calendarPlus">+</button></li>
+				<li>Upkeep Phase
+					<ol type="a">
+						<li>Determine Kingdom Stability</li>
+						<li>Pay Consumption</li>
+						<li>Fill Vacant Magic Item Slots
+							<input type="button" value="Fill all vacant item slots" id="fillItemSlots" />
+						</li>
+						<li>Deal With Unrest</li>
+					</ol>
+				</li>
+				<li>Improvement Phase
+					<ol type="a">
+						<li>Assign Leadership Roles</li>
+						<li>Claim Hexes</li>
+						<li>Improve Hexes (Roads/Farmlands)</li>
+						<li><span>Establish and Improve Cities <span class="expando">[-]</span></span>
+							<div>
+								Improvements for every district (comma-separated list of building names): <input type="text" name="improveCitiesBuildings" size="40" /><br/>
+								Keep treasury above: <input type="text" name="improveCitiesTreasuryLimit" size="4"/> Building limit: <span class="fromKingdom limitBuildingsCurrent"></span> buildings <span class="fromKingdom extraHouse"></span>
+								<input type="button" value="Improve cities" id="improveCitiesButton" />
+								<div id="improveCitiesOutput" class="output"></div>
+							</div>
+						</li>
+						<li>Edicts</li>
+					</ol>
+				</li>
+				<li>Income Phase
+					<ol type="a">
+						<li>Deposits</li>
+						<li>Withdrawals</li>
+						<li>Sell Valuable Items
+							<input type="button" value="Empty item slots with cheap items" id="emptyItemSlots" />
+							<input type="button" value="Sell most valuable items" id="sellItemSlots" />
+							<div id="valuableItemOutput" class="output"></div>
+						</li>
+						<li>Generate Income</li>
+					</ol>
+				</li>
+				<li>Event Phase</li>
+			</ol>
+		</div>
+	</div>
 
 </body>
 </html>

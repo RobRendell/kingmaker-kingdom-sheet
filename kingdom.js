@@ -31,6 +31,12 @@ String.prototype.intersect = function(other) {
         return (this.indexOf(other) >= 0 || other.indexOf(this) >= 0);
 }
 
+String.prototype.toTitleCase = function () {
+    return this.replace(/\w\S*/g, function (match) {
+        return match.charAt(0).toUpperCase() + match.substr(1).toLowerCase();
+    });
+}
+
 Number.prototype.plus = function() {
     if (this >= 0)
         return "+" + this.toString();
@@ -61,6 +67,18 @@ Array.prototype.joinAnd = function () {
         return this.slice(0, lastIndex).join(", ") + " and " + this[lastIndex];
     }
 };
+
+Array.prototype.shuffle = function () {
+    for (var end = this.length; end > 1; ) {
+        var from = Math.floor(Math.random() * end);
+        --end;
+        if (from != end) {
+            var swap = this[end];
+            this[end] = this[from];
+            this[from] = swap;
+        }
+    }
+}
 
 $.fn.editElement = function (callback, inputCallback) {
     var oldValue = $(this).text();
@@ -549,11 +567,30 @@ $.kingdom.Kingdom = Class.create({
                 city.fillItemSlots();
             }, this));
         }, this));
+        $('#improveCitiesButton').click($.proxy(function () {
+            var buildings = this.getChoice('improveCitiesBuildings');
+            var treasuryLimit = parseInt(this.getChoice('improveCitiesTreasuryLimit'));
+            this.improveCities(buildings, treasuryLimit);
+        }, this));
         $('#emptyItemSlots').click($.proxy(function () {
+            var count = 0;
             $.each(this.cities, $.proxy(function (cityName) {
                 var city = this.cities[cityName];
-                city.emptyCheapItemSlots();
+                count += city.emptyCheapItemSlots();
             }, this));
+            $('#valuableItemOutput').append($('<div/>').text('Emptied ' + count + ' slots.'));
+        }, this));
+        $('#sellItemSlots').click($.proxy(function () {
+            var numDistricts = 0;
+            $.each(this.cities, function (cityName, city) {
+                numDistricts += city.districts.length;
+            });
+            var slotsLeft = this.sellItemSlots('major', numDistricts, $('#valuableItemOutput'));
+            slotsLeft = this.sellItemSlots('medium', slotsLeft, $('#valuableItemOutput'));
+            slotsLeft = this.sellItemSlots('minor', slotsLeft, $('#valuableItemOutput'));
+            if (slotsLeft == numDistricts) {
+                $('#valuableItemOutput').append($('<div/>').text('No items to sell.'));
+            }
         }, this));
         $('#addCityButton').click($.proxy(function () {
             new $.kingdom.City(this);
@@ -575,6 +612,12 @@ $.kingdom.Kingdom = Class.create({
         $.each(Object.keys(this.data), $.proxy(function (index, field) {
             this.set(field, 0);
         }, this));
+    },
+
+    newTurn: function () {
+        $('.output').text('');
+        this.setChoice('buildsThisTurn', 0);
+        this.setChoice('extraHouse', true);
     },
 
     resetSheet: function () {
@@ -784,7 +827,16 @@ $.kingdom.Kingdom = Class.create({
         this.modify("Consumption", -farmsProduction, "Farms");
 
         this.limitsTable.refresh();
+        this.set('limitBuildingsCurrent', parseInt(this.get('limitBuildings')) - parseInt(this.getChoice('buildsThisTurn')));
+        this.setExtraHouse();
 
+    },
+
+    setExtraHouse: function (extraHouse) {
+        if (extraHouse !== undefined) {
+            this.setChoice('extraHouse', extraHouse);
+        }
+        this.set('extraHouse', (this.getChoice('extraHouse') == 'true') ? ' (+ 1 house)' : '');
     },
 
     recalculate: function () {
@@ -804,7 +856,7 @@ $.kingdom.Kingdom = Class.create({
         this.taxation.apply();
         this.festivals.apply();
 
-	// armies
+    	// armies
         this.armyTable.apply();
 
         // global factors
@@ -857,6 +909,73 @@ $.kingdom.Kingdom = Class.create({
                 });
             });
         });
+    },
+
+    sellItemSlots: function (type, count, element) {
+        // Find all slots containing items of the given type (starting with the highest slots)
+        var citiesAndSlots = [];
+        $.each(this.cities, $.proxy(function (cityName, city) {
+            citiesAndSlots = citiesAndSlots.concat(city.findItemSlotsWithItemsOfType(type));
+        }, this));
+        // Attempt to sell at most count of them
+        var itemTypes = [ 'major', 'medium', 'minor' ];
+        var itemSellDCs = [ 50, 35, 20 ];
+        var itemSellBPs = [ 15, 8, 2 ];
+        for (var index = 0; index < citiesAndSlots.length && count > 0; ++index, --count) {
+            var city = citiesAndSlots[index].city;
+            var slotType = citiesAndSlots[index].slotType;
+            var itemType = citiesAndSlots[index].itemType;
+            var slot = citiesAndSlots[index].slot;
+            var itemTypeIndex = itemTypes.indexOf(itemType);
+            var dc = itemSellDCs[itemTypeIndex];
+            var roll = parseInt(Math.random()*20) + 1;
+            var total = (roll > 1) ? roll + this.get('Economy') : 0;
+            if (total >= dc) {
+                var bp = itemSellBPs[itemTypeIndex];
+                this.spendTreasury(-bp);
+                element.append($('<div/>').text(`Successfully sold ${type} item "${city.itemSlots[slotType][slot].name}" in ${city.name} for ${bp} BPs, rolled ${roll} for total ${total} vs DC ${dc}.`).addClass('successfulSale'));
+                city.itemSlots[slotType][slot] = null;
+                city.refreshItemSlots();
+                city.save();
+            } else if (roll == 1) {
+                element.append($('<div/>').text(`Failed to sell ${type} item "${city.itemSlots[slotType][slot].name}" in ${city.name}, rolled natural 1.`).addClass('problem'));
+            } else {
+                element.append($('<div/>').text(`Failed to sell ${type} item "${city.itemSlots[slotType][slot].name}" in ${city.name}, rolled ${roll} for total ${total} vs DC ${dc}.`).addClass('problem'));
+            }
+        }
+        return count;
+    },
+
+    improveCities: function (buildingsString, treasuryLimit) {
+        var buildingNames = buildingsString.split(/, */);
+        var buildings = [];
+        for (var index = 0; index < buildingNames.length; ++index) {
+            var name = buildingNames[index].toTitleCase();
+            if ($.kingdom.Building.buildingData[name]) {
+                buildings.push($.kingdom.Building.get(name));
+            } else {
+                $('#improveCitiesOutput').append($('<div/>').text('Building name "' + name + '" unknown - skipping.').addClass('problem'));
+            }
+        }
+        var buildingLimit = parseInt(this.get('limitBuildings')) - parseInt(this.getChoice('buildsThisTurn'));
+        var cityNames = Object.keys(this.cities);
+        var extraHouse = this.getChoice('extraHouse');
+        while ((buildingLimit > 0 || extraHouse) && this.getTreasury() > treasuryLimit && cityNames.length > 0) {
+            var cityIndex = parseInt(Math.random() * cityNames.length)
+            var city = this.cities[cityNames[cityIndex]];
+            var numBuilt = city.automatedImprovement(buildings, treasuryLimit, buildingLimit, extraHouse);
+            if (!numBuilt) {
+                cityNames.splice(cityIndex, 1);
+            } else if (extraHouse && (numBuilt > 1 || buildingLimit == 0)) {
+                extraHouse = false;
+                buildingLimit -= numBuilt - 1;
+            } else {
+                buildingLimit -= numBuilt;
+            }
+        }
+        this.setChoice('buildsThisTurn', parseInt(this.get('limitBuildings')) - buildingLimit);
+        this.setExtraHouse(extraHouse);
+        $('#improveCitiesOutput').append($('<div/>').text('=== Finished automatically building improvements.'));
     },
 
     setRiversRunRedData: function () {
@@ -2890,6 +3009,14 @@ $.kingdom.District = Class.create({
         }, this));
     },
 
+    countOccupiedLots: function (index) {
+        var baseIndex = index & ~3;
+        return (this.buildings[baseIndex] ? 1 : 0)
+                + (this.buildings[baseIndex + 1] ? 1 : 0)
+                + (this.buildings[baseIndex + 2] ? 1 : 0)
+                + (this.buildings[baseIndex + 3] ? 1 : 0);
+    },
+
     houseCount: function (building) {
         return (building && building.getIsHouse()) ? 1 : 0;
     },
@@ -3156,6 +3283,124 @@ $.kingdom.District = Class.create({
         var otherDistrict = this.districtTo(side);
         if (otherDistrict)
             this.buildings[this.sideToIndex(side)] = undefined;
+    },
+
+    buildBuilding: function (building, index, cost) {
+        this.city.kingdom.spendTreasury(cost);
+        this.setBuilding(building, index);
+        if (building.getUnrest()) {
+            var unrest = parseInt(this.city.kingdom.getChoice("unrest", 0));
+            unrest += building.getUnrest();
+            if (unrest < 0)
+                unrest = 0;
+            this.city.kingdom.setChoice("unrest", unrest);
+        }
+    },
+
+    automatedImprovementFromList: function (list, treasuryLimit, buildingLimit, extraHouse, allowDuplicate) {
+        var house = $.kingdom.Building.get('House');
+        var landBorder = $.kingdom.Building.get('Land');
+        if (buildingLimit == 0 && extraHouse) {
+            list = [ house ];
+        } else {
+           // shuffle list to prevent building the same thing every time.
+           list.shuffle();
+        }
+        var treasury = this.city.kingdom.getTreasury();
+        for (var index = 0; index < list.length; ++index) {
+            var building = list[index];
+            // check if we can afford building
+            var remainingTreasury = treasury - this.buildingCost(building);
+            var ok = (remainingTreasury >= treasuryLimit);
+            if (building.getSize() != 'border') {
+                // check the building is a single lot
+                ok = ok && (building.getSize() == '1x1');
+                // if duplicates are not allowed, check if district already contains this building type
+                for (var lot = 0; ok && !allowDuplicate && lot < this.buildings.length; ++lot) {
+                    if (this.buildings[lot] && this.buildings[lot] == building) {
+                        ok = false;
+                    }
+                }
+            }
+            if (ok) {
+                var borderStart = this.sideToIndex('top');
+                var end = (building.getSize() == 'border') ? borderStart + 4 : borderStart;
+                var byWater = -1, newLot = -1, bestLot = -1;
+                var additionalHouses = {}, reservoirHits = {};
+                for (var lot = (building.getSize() == 'border') ? borderStart : 0; lot < end; ++lot) {
+                    if ((lot < borderStart && this.buildings[lot]) ||
+                            (lot >= borderStart && this.buildings[lot] !== landBorder) ||
+                            (building.getAdjacentWater() && !this.isAdjacentToWater(lot))) {
+                        continue;
+                    }
+                    var occupiedLots = this.countOccupiedLots(lot);
+                    var adjacentHouses = this.countAdjacentHouses(lot);
+                    additionalHouses[lot] = 0;
+                    if (building.getAdjacentHouses() > 0) {
+                        var extraHouseCount = building.getAdjacentHouses() - adjacentHouses;
+                        if (extraHouseCount > 0) {
+                            if (extraHouseCount > 3 - occupiedLots ||
+                                    extraHouseCount + 1 > buildingLimit + (extraHouse ? 1 : 0) ||
+                                    (remainingTreasury - this.buildingCost(house)*extraHouseCount < treasuryLimit)) {
+                                continue;
+                            }
+                            additionalHouses[lot] = extraHouseCount;
+                        }
+                    } else if (adjacentHouses > 0) {
+                        continue;
+                    }
+                    if (lot < borderStart && this.isAdjacentToWater(lot) && !building.getAdjacentWater()) {
+                        byWater = this.lotWithFewestAdditionalHouses(byWater, lot, additionalHouses, reservoirHits);
+                    } else if (lot < borderStart && occupiedLots == 0) {
+                        newLot = this.lotWithFewestAdditionalHouses(newLot, lot, additionalHouses, reservoirHits);
+                    } else {
+                        bestLot = this.lotWithFewestAdditionalHouses(bestLot, lot, additionalHouses, reservoirHits);
+                    }
+                }
+                var lot = (bestLot >= 0) ? bestLot : ((newLot >= 0) ? newLot : byWater);
+                if (lot >= 0) {
+                    var houseLot = (lot & ~3);
+                    for (var houseCount = 0; houseCount < additionalHouses[lot]; ++houseCount) {
+                        while (this.buildings[houseLot] || houseLot == lot) {
+                            ++houseLot;
+                        }
+                        var problem = this.getBuildingProblem(house, houseLot);
+                        if (problem) {
+                            $('#improveCitiesOutput').append($('<div/>').text('Failed to build extra house! Problem: ' + problem).addClass('problem'));
+                            return houseCount;
+                        } else {
+                            var houseCost = this.buildingCost(house);
+                            $('#improveCitiesOutput').append($('<div/>').text('Building house in ' + this.city.name + ' for ' + houseCost + ' BP'));
+                            this.buildBuilding(house, houseLot, houseCost);
+                        }
+                    }
+                    var problem = this.getBuildingProblem(building, lot);
+                    if (problem) {
+                        $('#improveCitiesOutput').append($('<div/>').text('Failed to build ' + building.name + '! Problem: ' + problem).addClass('problem'));
+                        return additionalHouses[lot];
+                    } else {
+                        $('#improveCitiesOutput').append($('<div/>').text('Building ' + building.name + ' in ' + this.city.name));
+                        this.buildBuilding(building, lot, this.buildingCost(building));
+                    }
+                    return additionalHouses[lot] + 1;
+                }
+            }
+        }
+        return 0;
+    },
+
+    lotWithFewestAdditionalHouses: function (previous, current, additionalHouses, reservoirHits) {
+        if (previous < 0 || additionalHouses[previous] > additionalHouses[current]) {
+            reservoirHits[current] = 1;
+            return current;
+        } else if (additionalHouses[previous] == additionalHouses[current]) {
+            var hits = reservoirHits[previous] + 1;
+            var result = (parseInt(Math.random() * hits) == 0) ? current : previous;
+            reservoirHits[result] = hits;
+            return result;
+        } else {
+            return previous;
+        }
     }
 
 });
@@ -3435,18 +3680,57 @@ $.kingdom.City = Class.create({
     },
 
     emptyCheapItemSlotsOfType: function (type, number) {
+        var count = 0;
         for (var slot = 0; slot < number; slot++) {
             if (this.itemSlots[type][slot] && this.itemSlots[type][slot].price < 4000) {
                 this.itemSlots[type][slot] = null;
+                count++;
             }
         }
+        return count;
     },
 
     emptyCheapItemSlots: function () {
-        this.emptyCheapItemSlotsOfType('minor', this.minorItems);
-        this.emptyCheapItemSlotsOfType('medium', this.mediumItems);
-        this.emptyCheapItemSlotsOfType('major', this.majorItems);
+        var count = 0;
+        count += this.emptyCheapItemSlotsOfType('minor', this.minorItems);
+        count += this.emptyCheapItemSlotsOfType('medium', this.mediumItems);
+        count += this.emptyCheapItemSlotsOfType('major', this.majorItems);
         this.refreshItemSlots();
+        this.save();
+        return count;
+    },
+
+    findItemSlotsWithItemsOfType: function (itemType) {
+        var result = [];
+        var slotType = [ 'major', 'medium', 'minor' ];
+        for (var slotTypeIndex = 0; slotTypeIndex < slotType.length; ++slotTypeIndex) {
+            var slotList = this.itemSlots[slotType[slotTypeIndex]];
+            for (var slot = 0; slot < slotList.length; ++slot) {
+                if (slotList[slot] != null && slotList[slot].classification.toLowerCase() == itemType &&
+                        slotList[slot].price >= 4000) {
+                    result.push({city: this, slotType: slotType[slotTypeIndex], itemType: itemType, slot: slot});
+                }
+            }
+        }
+        return result;
+    },
+
+    automatedImprovement: function (buildings, treasuryLimit, buildingLimit, extraHouse) {
+        for (var index = 0; index < this.districts.length; ++index) {
+            var district = this.districts[index];
+            var numBuilt = district.automatedImprovementFromList(buildings, treasuryLimit, buildingLimit, extraHouse, false);
+            if (numBuilt > 0) {
+                return numBuilt;
+            }
+        }
+        /*
+            Pick the building to build:
+                Have a list of building types we want in most districts (e.g. tavern, inn, smithy, granary, stables, city walls, barracks, watchtower).  If the city has a district without one of them, pick it.
+                Otherwise, look at the kingdom's Loyalty and Stability.  If either of them are less than N ahead of the command DC, pick a building that improves that stat, and pick it (avoid large buildings or buildings with item slots).
+                Otherwise, pick a building that improves Economy (avoid large buildings or buildings with item slots).
+            If the building picked requires an adjacent house, find a lot in the district adjacent to a house.  If none exist, but a block with two or more empty lots can be found, build a house in one of those lots.  Avoid choosing lots adjacent to a water border unless the picked building requires one.
+            Build the selected building in the chosen lot.
+        */
     },
 
     refreshStats: function () {
@@ -3725,6 +4009,8 @@ $.kingdom.CityBuilder = Class.create({
                 this.addToMenu('Repair ruin &mdash; too expensive (' + cost + ' BP)');
             else
                 this.addToMenu('Repair ruin &mdash; ' + cost + ' BP', this.repair);
+            if (this.district.canDemolish(this.index))
+                this.addToMenu('Demolish building', this.demolish);
         } else {
             this.addToMenu('Ruin building', this.ruin);
             if (this.district.canDemolish(this.index))
@@ -3751,14 +4037,12 @@ $.kingdom.CityBuilder = Class.create({
     },
 
     buildBuilding: function (building, cost) {
-        this.kingdom.spendTreasury(cost);
-        this.district.setBuilding(building, this.index);
-        if (building.getUnrest()) {
-            var unrest = parseInt(this.kingdom.getChoice("unrest", 0));
-            unrest += building.getUnrest();
-            if (unrest < 0)
-                unrest = 0;
-            this.kingdom.setChoice("unrest", unrest);
+        this.district.buildBuilding(building, this.index, cost);
+        if (building.name == 'House' && this.kingdom.getChoice('extraHouse') == 'true') {
+            this.kingdom.setExtraHouse(false);
+        } else {
+            var buildsThisTurn = parseInt(this.kingdom.getChoice('buildsThisTurn'));
+            this.kingdom.setChoice('buildsThisTurn', buildsThisTurn + 1);
         }
     },
 
@@ -3776,7 +4060,7 @@ $.kingdom.CityBuilder = Class.create({
     close: function (evt) {
         $(document).unbind('click.buildMenu');
         this.menu.hide();
-	$('#titleDiv').hide();
+    	$('#titleDiv').hide();
         $(this.target).removeClass("buildingSite");
         this.district = null;
         if (evt) {
@@ -5222,13 +5506,13 @@ $.kingdom.Calendar = Class.create({
         this.month = this.kingdom.getChoice('calendarMonth', 2);
         this.monthNames = this.kingdom.getArrayChoice('monthNames', [ 'Abadius', 'Calistril', 'Pharast', 'Gozran', 'Desnus', 'Sarenith', 'Erastus', 'Arodus', 'Rova', 'Lamashan', 'Neth', 'Kuthona' ]);
         this.seasons = this.kingdom.getArrayChoice('seasons', [ 'Winter 2', 'Winter 3', 'Spring 1', 'Spring 2', 'Spring 3', 'Summer 1', 'Summer 2', 'Summer 3', 'Autumn 1', 'Autumn 2', 'Autumn 3', 'Winter 1' ]);
-        $('#calendarMinus').click($.proxy(this.minus, this));
-        $('#calendarPlus').click($.proxy(this.plus, this));
+        $('.calendarMinus').click($.proxy(this.minus, this));
+        $('.calendarPlus').click($.proxy(this.plus, this));
         this.refresh();
     },
 
     refresh: function () {
-        $('#calendar').text(this.toString());
+        $('.calendar').text(this.toString());
     },
 
     toString: function () {
@@ -5243,6 +5527,7 @@ $.kingdom.Calendar = Class.create({
         }
         this.save();
         this.refresh();
+        this.kingdom.newTurn();
     },
 
     plus: function () {
@@ -5253,6 +5538,7 @@ $.kingdom.Calendar = Class.create({
         }
         this.save();
         this.refresh();
+        this.kingdom.newTurn();
     },
 
     save: function () {

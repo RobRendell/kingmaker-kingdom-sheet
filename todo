@@ -5,7 +5,7 @@ Generalise not adjacent to to take a list of buildings
 
 UC: Settlement base value starts at 0, not 200
 
-Generalise adjacent to to take list of buildings?  UC has variations that do/don't include Mansions and Villas.  Might make it hard to score...
+Generalise "adjacent to" to take list of buildings?  UC has variations that do/don't include Mansions and Villas.  Might make it hard to score...
 
 Hard to score positive "houseness" in UC with it not being something intrinsic to the building, but instead being referred to by other buildings.
 
