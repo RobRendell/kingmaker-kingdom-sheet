@@ -960,10 +960,12 @@ $.kingdom.Kingdom = Class.create({
         var buildingLimit = parseInt(this.get('limitBuildings')) - parseInt(this.getChoice('buildsThisTurn'));
         var cityNames = Object.keys(this.cities);
         var extraHouse = this.getChoice('extraHouse');
-        while ((buildingLimit > 0 || extraHouse) && this.getTreasury() > treasuryLimit && cityNames.length > 0) {
+        var userBuildings = true;
+        var goal;
+        while (buildingLimit > 0 && this.getTreasury() > treasuryLimit && cityNames.length > 0) {
             var cityIndex = parseInt(Math.random() * cityNames.length)
             var city = this.cities[cityNames[cityIndex]];
-            var numBuilt = city.automatedImprovement(buildings, treasuryLimit, buildingLimit, extraHouse);
+            var numBuilt = city.automatedImprovement(buildings, treasuryLimit, buildingLimit, extraHouse, !userBuildings);
             if (!numBuilt) {
                 cityNames.splice(cityIndex, 1);
             } else if (extraHouse && (numBuilt > 1 || buildingLimit == 0)) {
@@ -972,10 +974,62 @@ $.kingdom.Kingdom = Class.create({
             } else {
                 buildingLimit -= numBuilt;
             }
+            if (cityNames.length == 0 && userBuildings) {
+                userBuildings = false;
+                cityNames = Object.keys(this.cities);
+            }
+            if (!userBuildings) {
+                var newGoal = this.determineImproveCitiesGoal();
+                if (newGoal != goal) {
+                    goal = newGoal;
+                    buildings = this.getBuildingsForGoal(goal);
+                }
+            }
         }
         this.setChoice('buildsThisTurn', parseInt(this.get('limitBuildings')) - buildingLimit);
         this.setExtraHouse(extraHouse);
         $('#improveCitiesOutput').append($('<div/>').text('=== Finished automatically building improvements.'));
+    },
+
+    determineImproveCitiesGoal: function () {
+        var target = parseInt(this.get('ControlDC')) + parseInt(this.getChoice('improveCitiesMargin'));
+        var loyalty = this.get('Loyalty');
+        var stability = this.get('Stability');
+        if (loyalty < target) {
+            if (stability < target) {
+                return (loyalty < stability) ? 'Loyalty' : 'Stability';
+            } else {
+                return 'Loyalty';
+            }
+        } else if (stability < target) {
+            return 'Stability';
+        } else {
+            return 'Economy';
+        }
+    },
+
+    getBuildingsForGoal: function (goal) {
+        if (!this.goalBuildings) {
+            this.goalBuildings = {};
+        }
+        if (!this.goalBuildings[goal]) {
+            this.goalBuildings[goal] = [];
+            $.kingdom.Building.eachBuilding($.proxy(function (building) {
+                if (building.getSize() != '1x1' || !building.getData()[goal]) {
+                    return;
+                }
+                var cost = building.getCost();
+                var idealCost = this.calculateIdealCost(building.getData());
+                if (cost <= idealCost * 1.1) {
+                    if (cost < idealCost * 0.9) {
+                        // double chance for good-value buildings
+                        this.goalBuildings[goal].push(building);
+                    }
+                    this.goalBuildings[goal].push(building);
+                }
+            }, this));
+        }
+        return this.goalBuildings[goal];
     },
 
     setRiversRunRedData: function () {
@@ -1989,27 +2043,8 @@ $.kingdom.Kingdom = Class.create({
             };
             if (economyBoost)
                 data.Economy = z(data.Economy) + z(data.minorItems) + 2*z(data.mediumItems) + 3*z(data.majorItems);
-            var cost;
             if (calculate) {
-                cost =
-                    3 * (z(data.Economy) + z(data.Loyalty) + z(data.Stability) + z(data.Defense)) +
-                    parseInt((z(data.cityValue) + 99) / 100) - z(data.Unrest);
-                if (data.isHouse)
-                    cost += 3;
-                if (data.adjacentHouses)
-                    cost -= 3 * data.adjacentHouses;
-                if (data.halveCost)
-                    cost += 4 * data.halveCost.length;
-                if (data.halveKingdom)
-                    cost += 8;
-                if (!economyBoost) {
-                    if (data.majorItems)
-                        cost += 3 * 15;
-                    else if (data.mediumItems)
-                        cost += 3 * 8;
-                    else if (data.minorItems)
-                        cost += 3 * 2;
-                }
+                var cost = this.calculateIdealCost(data);
                 if (cost == data.cost)
                     console.info(name + ' didn\'t change from ' + cost);
                 else {
@@ -2022,12 +2057,35 @@ $.kingdom.Kingdom = Class.create({
                         above = cost - data.cost;
                 }
                 data.cost = cost;
-            } else {
-                cost = data.cost;
             }
         });
         console.info('Prices varied from +' + above + ' to -' + below);
     },
+
+    calculateIdealCost: function (data) {
+        var z = function (value) {
+            return parseInt(value) || 0;
+        };
+        var cost = 3 * (z(data.Economy) + z(data.Loyalty) + z(data.Stability) + z(data.Defense)) +
+            Math.floor((z(data.cityValue) + 99) / 100) - z(data.Unrest);
+        if (data.isHouse)
+            cost += 3;
+        if (data.adjacentHouses)
+            cost -= 3 * data.adjacentHouses;
+        if (data.halveCost)
+            cost += 4 * data.halveCost.length;
+        if (data.halveKingdom)
+            cost += 8;
+        if (!this.getBooleanChoice('hrCalculateEconomyBoost')) {
+            if (data.majorItems)
+                cost += 3 * 15;
+            else if (data.mediumItems)
+                cost += 3 * 8;
+            else if (data.minorItems)
+                cost += 3 * 2;
+        }
+        return cost;
+    }
 
 });
 
@@ -2633,6 +2691,10 @@ $.kingdom.Building = Class.create({
             city.productivity += this.getProductivity();
         if (this.getSociety())
             city.society += this.getSociety();
+    },
+
+    getData: function () {
+        return $.kingdom.Building.buildingData[this.name];
     },
 
     getSize: function () {
@@ -3379,8 +3441,9 @@ $.kingdom.District = Class.create({
                         $('#improveCitiesOutput').append($('<div/>').text('Failed to build ' + building.name + '! Problem: ' + problem).addClass('problem'));
                         return additionalHouses[lot];
                     } else {
-                        $('#improveCitiesOutput').append($('<div/>').text('Building ' + building.name + ' in ' + this.city.name));
-                        this.buildBuilding(building, lot, this.buildingCost(building));
+                        var cost = this.buildingCost(building);
+                        $('#improveCitiesOutput').append($('<div/>').text('Building ' + building.name + ' in ' + this.city.name + ' for ' + cost + ' BPs'));
+                        this.buildBuilding(building, lot, cost);
                     }
                     return additionalHouses[lot] + 1;
                 }
@@ -3715,22 +3778,15 @@ $.kingdom.City = Class.create({
         return result;
     },
 
-    automatedImprovement: function (buildings, treasuryLimit, buildingLimit, extraHouse) {
+    automatedImprovement: function (buildings, treasuryLimit, buildingLimit, extraHouse, allowDuplicate) {
         for (var index = 0; index < this.districts.length; ++index) {
             var district = this.districts[index];
-            var numBuilt = district.automatedImprovementFromList(buildings, treasuryLimit, buildingLimit, extraHouse, false);
+            var numBuilt = district.automatedImprovementFromList(buildings, treasuryLimit, buildingLimit, extraHouse, allowDuplicate);
             if (numBuilt > 0) {
                 return numBuilt;
             }
         }
-        /*
-            Pick the building to build:
-                Have a list of building types we want in most districts (e.g. tavern, inn, smithy, granary, stables, city walls, barracks, watchtower).  If the city has a district without one of them, pick it.
-                Otherwise, look at the kingdom's Loyalty and Stability.  If either of them are less than N ahead of the command DC, pick a building that improves that stat, and pick it (avoid large buildings or buildings with item slots).
-                Otherwise, pick a building that improves Economy (avoid large buildings or buildings with item slots).
-            If the building picked requires an adjacent house, find a lot in the district adjacent to a house.  If none exist, but a block with two or more empty lots can be found, build a house in one of those lots.  Avoid choosing lots adjacent to a water border unless the picked building requires one.
-            Build the selected building in the chosen lot.
-        */
+        return 0;
     },
 
     refreshStats: function () {
