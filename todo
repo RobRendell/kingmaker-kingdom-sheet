@@ -1,5 +1,11 @@
 
+* Free Build mode (checkbox next to "Add City")
+
+* Buttons in kingdom turn to grow kingdom, build road, build farm
+
 * Cities should prefer to auto-build cheaper buildings (esp. ones with discounts)
+
+* penalize choice of buildings that are already in a district
 
 * Shouldn't generally build unrest-reducing buildings unless unrest > 0?
 

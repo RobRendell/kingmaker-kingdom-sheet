@@ -1105,8 +1105,8 @@ $.kingdom.Kingdom = Class.create({
         if (!this.goalBuildings[goal]) {
             this.goalBuildings[goal] = [];
             $.kingdom.Building.eachBuilding($.proxy(function (building) {
-                if (building.getSize() != '1x1' || !building.getData()[goal] ||
-                        (goal == 'Unrest' && building.getUnrest() > 0)) {
+                if (building.getSize() == '2x2' || building.getSize() == 'border' ||
+                        !building.getData()[goal] || (goal == 'Unrest' && building.getUnrest() > 0)) {
                     return;
                 }
                 var cost = building.getCost();
@@ -2792,6 +2792,16 @@ $.kingdom.Building = Class.create({
         return $.kingdom.Building.buildingData[this.name].size;
     },
 
+    getLots: function () {
+        if (this.getSize() == '1x1') {
+            return 1;
+        } else if (this.getSize() == '2x1') {
+            return 2;
+        } else if (this.getSize() == '2x2') {
+            return 4;
+        }
+    },
+
     getImage: function () {
         return $.kingdom.Building.buildingData[this.name].image;
     },
@@ -3347,9 +3357,27 @@ $.kingdom.District = Class.create({
         this.city.render();
     },
 
+    isEnoughRoom: function (building, index) {
+        if (this.buildings[index]) {
+            return false;
+        } else if (building.getSize() == "2x1") {
+            var horz = (index & 1) ? -1 : 1;
+            var vert = (index & 2) ? -2 : 2;
+            return !(this.buildings[index + horz] && this.buildings[index + vert]);
+        } else if (building.getSize() == "2x2") {
+            var baseIndex = index & (~3);
+            var freeLots = ((this.buildings[baseIndex]) ? 0 : 1) +
+                    ((this.buildings[baseIndex + 1]) ? 0 : 1) +
+                    ((this.buildings[baseIndex + 2]) ? 0 : 1) +
+                    ((this.buildings[baseIndex + 3]) ? 0 : 1);
+            return (freeLots == 4);
+        } else {
+            return true;
+        }
+    },
+
     getBuildingProblem: function (building, index) {
         var problem;
-        var existing = this.buildings[index];
         if (building.getOnePerCity() && this.city.onlyOne[building.name])
             problem = "already one in this city";
         else if (building.getAdjacentWater() && !this.isAdjacentToWater(index, building))
@@ -3360,27 +3388,14 @@ $.kingdom.District = Class.create({
             problem = "adjacent to houses";
         else if (building.getIsHouse() && this.noHousesAllowedCheck(index))
             problem = "no houses allowed adjacent to " + this.noHousesAllowedCheck(index);
-        if (existing && building.getSize() <= existing.getSize()) {
-            // replacing existing building of equal or greater size - no size problems
-        } else if (building.getSize() == "2x1") {
-            var horz = (index & 1) ? -1 : 1;
-            var vert = (index & 2) ? -2 : 2;
-            if (this.buildings[index + horz] && this.buildings[index + vert])
+        else if (!this.isEnoughRoom(building, index)) {
+            if (building.getSize() == "2x1") {
                 problem = "not enough room - occupies 2 lots";
-        } else if (building.getSize() == "2x2") {
-            var baseIndex = index & (~3);
-            var freeLots = ((this.buildings[baseIndex]) ? 0 : 1) +
-                    ((this.buildings[baseIndex + 1]) ? 0 : 1) +
-                    ((this.buildings[baseIndex + 2]) ? 0 : 1) +
-                    ((this.buildings[baseIndex + 3]) ? 0 : 1);
-            if (!existing)
-                ;
-            else if (existing.getSize() == '1x1')
-                freeLots += 1;
-            else if (existing.getSize() == '2x1')
-                freeLots += 2;
-            if (freeLots < 4)
+            } else if (building.getSize() == "2x2") {
                 problem = "not enough room - occupies 4 lots";
+            } else {
+                problem = "not enough room";
+            }
         }
         if (building.getOnlyEmpty() && !this.isEmpty())
             problem = "can only be set on empty districts";
@@ -3465,9 +3480,7 @@ $.kingdom.District = Class.create({
             // check if we can afford building
             var remainingTreasury = treasury - this.buildingCost(building);
             var ok = (remainingTreasury >= treasuryLimit);
-            if (building.getSize() != 'border') {
-                // check the building is a single lot
-                ok = ok && (building.getSize() == '1x1');
+            if (ok && building.getSize() != 'border') {
                 // if duplicates are not allowed, check if district already contains this building type
                 for (var lot = 0; ok && !allowDuplicate && lot < this.buildings.length; ++lot) {
                     if (this.buildings[lot] && this.buildings[lot] == building) {
@@ -3481,7 +3494,7 @@ $.kingdom.District = Class.create({
                 var byWater = -1, newLot = -1, bestLot = -1;
                 var additionalHouses = {}, reservoirHits = {};
                 for (var lot = (building.getSize() == 'border') ? borderStart : 0; lot < end; ++lot) {
-                    if ((lot < borderStart && this.buildings[lot]) ||
+                    if ((lot < borderStart && !this.isEnoughRoom(building, lot)) ||
                             (lot >= borderStart && this.buildings[lot] !== landBorder) ||
                             (building.getAdjacentWater() && !this.isAdjacentToWater(lot, building))) {
                         continue;
@@ -3492,7 +3505,8 @@ $.kingdom.District = Class.create({
                     if (building.getAdjacentHouses() > 0) {
                         var extraHouseCount = building.getAdjacentHouses() - adjacentHouses;
                         if (extraHouseCount > 0) {
-                            if (extraHouseCount > 3 - occupiedLots || this.noHousesAllowedCheck(lot) ||
+                            if (extraHouseCount + occupiedLots + building.getLots() > 4 ||
+                                    this.noHousesAllowedCheck(lot) ||
                                     extraHouseCount + 1 > buildingLimit + (extraHouse ? 1 : 0) ||
                                     (remainingTreasury - this.buildingCost(house)*extraHouseCount < treasuryLimit)) {
                                 continue;
@@ -3527,15 +3541,16 @@ $.kingdom.District = Class.create({
                             this.buildBuilding(house, houseLot, houseCost);
                         }
                     }
-                    var problem = this.getBuildingProblem(building, lot);
-                    if (problem) {
-                        $('#improveCitiesOutput').append($('<div/>').text('Failed to build ' + building.name + '! Problem: ' + problem).addClass('problem'));
-                        return additionalHouses[lot];
-                    } else {
-                        var cost = this.buildingCost(building);
-                        $('#improveCitiesOutput').append($('<div/>').text('Building ' + building.name + ' in ' + this.city.name + ' for ' + cost + ' BPs'));
-                        this.buildBuilding(building, lot, cost);
+                    if (lot < borderStart) {
+                        var problem = this.getBuildingProblem(building, lot);
+                        if (problem) {
+                            $('#improveCitiesOutput').append($('<div/>').text('Failed to build ' + building.name + '! Problem: ' + problem).addClass('problem'));
+                            return additionalHouses[lot];
+                        }
                     }
+                    var cost = this.buildingCost(building);
+                    $('#improveCitiesOutput').append($('<div/>').text('Building ' + building.name + ' in ' + this.city.name + ' for ' + cost + ' BPs'));
+                    this.buildBuilding(building, lot, cost);
                     return additionalHouses[lot] + 1;
                 }
             }
