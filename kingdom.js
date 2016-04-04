@@ -3400,7 +3400,7 @@ $.kingdom.District = Class.create({
 
     isEnoughRoom: function (building, index) {
         if (building.getSize() == 'border') {
-            return (this.buildings[index].name == 'Land');
+            return (this.buildings[index] && this.buildings[index].name == 'Land');
         } else if (this.buildings[index]) {
             return false;
         } else if (building.getSize() == "2x1") {
