@@ -1011,7 +1011,11 @@ $.kingdom.Kingdom = Class.create({
         this.pushItemTypeTotal(result, totals.Major, 'major');
         this.pushItemTypeTotal(result, totals.Medium, 'medium');
         this.pushItemTypeTotal(result, totals.Minor, 'minor');
-        $('#fillItemSlotsOutput').append($('<div/>').text('Added ' + result.joinAnd() + '.'));
+        if (result.length > 0) {
+            $('#fillItemSlotsOutput').append($('<div/>').text('Added ' + result.joinAnd() + '.'));
+        } else {
+            $('#fillItemSlotsOutput').append($('<div/>').text('No items added.'));
+        }
     },
 
     pushItemTypeTotal: function (list, number, type) {
@@ -3395,7 +3399,9 @@ $.kingdom.District = Class.create({
     },
 
     isEnoughRoom: function (building, index) {
-        if (this.buildings[index]) {
+        if (building.getSize() == 'border') {
+            return (this.buildings[index].name == 'Land');
+        } else if (this.buildings[index]) {
             return false;
         } else if (building.getSize() == "2x1") {
             var horz = (index & 1) ? -1 : 1;
