@@ -609,7 +609,11 @@ $.kingdom.Kingdom = Class.create({
         $('#improveCitiesButton').click($.proxy(function () {
             var buildings = this.getChoice('improveCitiesBuildings');
             var treasuryLimit = parseInt(this.getChoice('improveCitiesTreasuryLimit'));
-            this.improveCities(buildings, treasuryLimit);
+            if ($('#freeBuildCheckbox').prop('checked')) {
+                $('#improveCitiesOutput').append($('<div/>').text('Error: cannot auto-improve cities in free build mode.').addClass('problem'));
+            } else {
+                this.improveCities(buildings, treasuryLimit);
+            }
         }, this));
         $('#emptyItemSlots').click($.proxy(function () {
             var count = 0;
@@ -3267,7 +3271,7 @@ $.kingdom.District = Class.create({
     repairBuilding: function(index)
     {
         var ruin = this.buildings[index];
-        var cost = parseInt(this.buildingCost(ruin.building)/2);
+        var cost = Math.floor(this.buildingCost(ruin.building)/2);
         this.city.kingdom.spendTreasury(cost);
         this.buildings[index] = ruin.building;
         this.save();
@@ -3329,6 +3333,9 @@ $.kingdom.District = Class.create({
     },
 
     buildingCost: function (building) {
+        if ($('#freeBuildCheckbox').prop('checked')) {
+            return 0;
+        }
         var cost = building.getCost();
         if (this.city.halfCost[building.name])
             cost /= 2;
@@ -3746,8 +3753,10 @@ $.kingdom.City = Class.create({
                     terrainSelect.remove();
                     this.appendTerrain(terrainText);
                     this.save();
-                    var cost = this.getDistrictCost();
-                    this.kingdom.spendTreasury(cost);
+                    if (!$('#freeBuildCheckbox').prop('checked')) {
+                        var cost = this.getDistrictCost();
+                        this.kingdom.spendTreasury(cost);
+                    }
                 }, this));
             }
             this.parentDiv.append(terrainText);
@@ -4104,8 +4113,10 @@ $.kingdom.CityBuilder = Class.create({
     extend: function () {
         var side = this.district.indexToSide(this.index);
         this.district.extendCity(side);
-        var cost = this.district.city.getDistrictCost();
-        this.kingdom.spendTreasury(cost);
+        if (!$('#freeBuildCheckbox').prop('checked')) {
+            var cost = this.district.city.getDistrictCost();
+            this.kingdom.spendTreasury(cost);
+        }
     },
 
     selectBorder: function (evt) {
