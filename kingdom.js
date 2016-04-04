@@ -358,7 +358,7 @@ $.kingdom.Choices = Class.create({
         if (value instanceof Array)
             value = value.join("|");
         this.data[this.prefix + name] = value;
-        $('input[name="' + name + '"]').val(value);
+        $('*[name="' + name + '"]').val(value);
     },
 
     get: function (name) {
@@ -605,6 +605,36 @@ $.kingdom.Kingdom = Class.create({
         }, this));
         $('#fillItemSlots').click($.proxy(function () {
             this.fillMagicItemSlots();
+        }, this));
+        $('#claimHexButton').click($.proxy(function () {
+            var newSize = parseInt(this.getChoice('size')) + 1;
+            this.setChoice('size', newSize);
+            this.spendTreasury(1);
+            $('#claimHexOutput').append($('<div/>').text('Increased kingdom size to ' + newSize));
+        }, this));
+        $('.buildRoadButton').click($.proxy(function (evt) {
+            var cost = parseInt($(evt.target).attr('name'));
+            var size = parseInt(this.getChoice('size'));
+            var newRoads = parseInt(this.getChoice('roads')) + 1;
+            if (newRoads <= size) {
+                this.setChoice('roads', newRoads);
+                this.spendTreasury(cost);
+                $('#improveHexOutput').append($('<div/>').text('Spent ' + cost + ' BPs to build new road, new total is ' + newRoads));
+            } else {
+                $('#improveHexOutput').append($('<div/>').text('Cannot have more roads than hexes!').addClass('problem'));
+            }
+        }, this));
+        $('.buildFarmButton').click($.proxy(function (evt) {
+            var cost = parseInt($(evt.target).attr('name'));
+            var roads = parseInt(this.getChoice('roads'));
+            var newFarms = parseInt(this.getChoice('farms')) + 1;
+            if (newFarms <= roads) {
+                this.setChoice('farms', newFarms);
+                this.spendTreasury(cost);
+                $('#improveHexOutput').append($('<div/>').text('Spent ' + cost + ' BPs to build new farm, new total is ' + newFarms));
+            } else {
+                $('#improveHexOutput').append($('<div/>').text('Cannot have more farms than roads!').addClass('problem'));
+            }
         }, this));
         $('#improveCitiesButton').click($.proxy(function () {
             var buildings = this.getChoice('improveCitiesBuildings');

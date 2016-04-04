@@ -432,14 +432,33 @@
 				<li>Improvement Phase
 					<ol type="a">
 						<li>Assign Leadership Roles</li>
-						<li>Claim Hexes</li>
-						<li>Improve Hexes (Roads/Farmlands)</li>
+						<li>Claim Hexes (limit of <span class="fromKingdom limitHexes"></span> per month)
+							<input type="button" value="Claim one hex for 1 BP" id="claimHexButton"/>
+							<div id="claimHexOutput" class="output"></div>
+						</li>
+						<li><span>Improve Hexes <span class="expando">[-]</span></span>
+							<ul>
+								<li>
+									Build roads (limit of <span class="fromKingdom limitRoads"></span> per month):
+										<input type="button" value="plains/hills (1 BP)" name="1" class="buildRoadButton"/>
+									<input type="button" value="forest, or plains/hills with river (2 BP)" name="2" class="buildRoadButton"/>
+									<input type="button" value="swamps/mountains, or forest with river (4 BP)" name="4" class="buildRoadButton"/>
+									<input type="button" value="swamps/mountains with river (8 BP)" name="8" class="buildRoadButton"/>
+								</li>
+								<li>
+									Build farms (limit of <span class="fromKingdom limitFarmlands"></span> per month):
+									<input type="button" value="plains (2 BP)" name="2" class="buildFarmButton"/>
+									<input type="button" value="hills (4 BP)" name="4" class="buildFarm4utton"/>
+								</li>
+							</ul>
+							<div id="improveHexOutput" class="output"></div>
+						</li>
 						<li><span>Establish and Improve Cities <span class="expando">[-]</span></span>
-							<div>
+							<div class="indent">
 								Improvements for every district (comma-separated list of building names): <input type="text" name="improveCitiesBuildings" size="60" /><br/>
 								Keep treasury above: <input type="text" name="improveCitiesTreasuryLimit" size="4"/> BPs<br/>
 								Keep Loyalty and Stability ahead of Command DC by: <input type="text" name="improveCitiesMargin" size="4"/><br/>
-								Building limit: <span class="fromKingdom limitBuildingsCurrent"></span> <span class="fromKingdom extraHouse"></span><br/>
+								Remaining builds this month: <span class="fromKingdom limitBuildingsCurrent"></span> <span class="fromKingdom extraHouse"></span><br/>
 								<input type="button" value="Improve cities" id="improveCitiesButton" />
 								<div id="improveCitiesOutput" class="output"></div>
 							</div>
