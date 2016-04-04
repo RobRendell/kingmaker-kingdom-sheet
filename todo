@@ -1,13 +1,4 @@
 
-* Cities should prefer to auto-build cheaper buildings (esp. ones with discounts)
-
-* penalize choice of buildings that are already in a district
-
-* Shouldn't generally build unrest-reducing buildings unless unrest > 0?
-
-
-
-
 * Importing an old version of a kingdom, newer data saved in local storage can be loaded (e.g. build & populate a new
     city district, import older version, build same district again -> loads buildings previously set there).
 

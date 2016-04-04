@@ -1143,17 +1143,8 @@ $.kingdom.Kingdom = Class.create({
         if (!this.goalBuildings[goal]) {
             this.goalBuildings[goal] = [];
             $.kingdom.Building.eachBuilding($.proxy(function (building) {
-                if (building.getSize() == '2x2' || building.getSize() == 'border' ||
-                        !building.getData()[goal] || (goal == 'Unrest' && building.getUnrest() > 0)) {
-                    return;
-                }
-                var cost = building.getCost();
-                var idealCost = this.calculateIdealCost(building.getData());
-                if (cost <= idealCost * 1.1) {
-                    if (cost < idealCost * 0.9) {
-                        // double chance for good-value buildings
-                        this.goalBuildings[goal].push(building);
-                    }
+                if ((building.getSize() == '1x1' || building.getSize() == '2x1') &&
+                        building.getData()[goal] && (goal != 'Unrest' || building.getUnrest() < 0)) {
                     this.goalBuildings[goal].push(building);
                 }
             }, this));
@@ -3508,16 +3499,26 @@ $.kingdom.District = Class.create({
         }
     },
 
+    countSameBuildings: function (building) {
+        var count = 0;
+        for (var lot = 0; lot < this.buildings.length; ++lot) {
+            if (this.buildings[lot] && this.buildings[lot] == building) {
+                ++count;
+            }
+        }
+        return count;
+    },
+
     automatedImprovementFromList: function (list, treasuryLimit, buildingLimit, extraHouse, allowDuplicate) {
         var house = $.kingdom.Building.get('House');
         var landBorder = $.kingdom.Building.get('Land');
+        var borderStart = this.sideToIndex('top');
         if (buildingLimit == 0 && extraHouse) {
             list = [ house ];
-        } else {
-           // shuffle list to prevent building the same thing every time.
-           list.shuffle();
         }
         var treasury = this.city.kingdom.getTreasury();
+        var selectedBuild = null;
+        var hits = 0;
         for (var index = 0; index < list.length; ++index) {
             var building = list[index];
             // check if we can afford building
@@ -3525,78 +3526,87 @@ $.kingdom.District = Class.create({
             var ok = (remainingTreasury >= treasuryLimit);
             if (ok && building.getSize() != 'border') {
                 // if duplicates are not allowed, check if district already contains this building type
-                for (var lot = 0; ok && !allowDuplicate && lot < this.buildings.length; ++lot) {
-                    if (this.buildings[lot] && this.buildings[lot] == building) {
-                        ok = false;
+                ok = (allowDuplicate || this.countSameBuildings(building) == 0);
+            }
+            if (!ok) {
+                continue;
+            }
+            var end = (building.getSize() == 'border') ? borderStart + 4 : borderStart;
+            var byWater = -1, newLot = -1, bestLot = -1;
+            var additionalHouses = {}, reservoirHits = {};
+            for (var lot = (building.getSize() == 'border') ? borderStart : 0; lot < end; ++lot) {
+                if ((lot < borderStart && !this.isEnoughRoom(building, lot)) ||
+                        (lot >= borderStart && this.buildings[lot] !== landBorder) ||
+                        (building.getAdjacentWater() && !this.isAdjacentToWater(lot, building))) {
+                    continue;
+                }
+                var occupiedLots = this.countOccupiedLots(lot);
+                var adjacentHouses = this.countAdjacentHouses(lot);
+                additionalHouses[lot] = 0;
+                if (building.getAdjacentHouses() > 0) {
+                    var extraHouseCount = building.getAdjacentHouses() - adjacentHouses;
+                    if (extraHouseCount > 0) {
+                        if (extraHouseCount + occupiedLots + building.getLots() > 4 ||
+                                this.noHousesAllowedCheck(lot) ||
+                                extraHouseCount + 1 > buildingLimit + (extraHouse ? 1 : 0) ||
+                                (remainingTreasury - this.buildingCost(house)*extraHouseCount < treasuryLimit)) {
+                            continue;
+                        }
+                        additionalHouses[lot] = extraHouseCount;
+                    }
+                } else if (adjacentHouses > 0) {
+                    continue;
+                }
+                if (lot < borderStart && this.isAdjacentToWater(lot, building) && !building.getAdjacentWater()) {
+                    byWater = this.lotWithFewestAdditionalHouses(byWater, lot, additionalHouses, reservoirHits);
+                } else if (lot < borderStart && occupiedLots == 0) {
+                    newLot = this.lotWithFewestAdditionalHouses(newLot, lot, additionalHouses, reservoirHits);
+                } else {
+                    bestLot = this.lotWithFewestAdditionalHouses(bestLot, lot, additionalHouses, reservoirHits);
+                }
+            }
+            var lot = (bestLot >= 0) ? bestLot : ((newLot >= 0) ? newLot : byWater);
+            if (lot >= 0) {
+                var score = this.scoreAutomatedBuild(building, lot, additionalHouses[lot]);
+                if (score > 0) {
+                    hits += score;
+                    if (Math.random()*hits < score) {
+                        selectedBuild = { building: building, lot: lot, additionalHouses: additionalHouses[lot] };
                     }
                 }
             }
-            if (ok) {
-                var borderStart = this.sideToIndex('top');
-                var end = (building.getSize() == 'border') ? borderStart + 4 : borderStart;
-                var byWater = -1, newLot = -1, bestLot = -1;
-                var additionalHouses = {}, reservoirHits = {};
-                for (var lot = (building.getSize() == 'border') ? borderStart : 0; lot < end; ++lot) {
-                    if ((lot < borderStart && !this.isEnoughRoom(building, lot)) ||
-                            (lot >= borderStart && this.buildings[lot] !== landBorder) ||
-                            (building.getAdjacentWater() && !this.isAdjacentToWater(lot, building))) {
-                        continue;
-                    }
-                    var occupiedLots = this.countOccupiedLots(lot);
-                    var adjacentHouses = this.countAdjacentHouses(lot);
-                    additionalHouses[lot] = 0;
-                    if (building.getAdjacentHouses() > 0) {
-                        var extraHouseCount = building.getAdjacentHouses() - adjacentHouses;
-                        if (extraHouseCount > 0) {
-                            if (extraHouseCount + occupiedLots + building.getLots() > 4 ||
-                                    this.noHousesAllowedCheck(lot) ||
-                                    extraHouseCount + 1 > buildingLimit + (extraHouse ? 1 : 0) ||
-                                    (remainingTreasury - this.buildingCost(house)*extraHouseCount < treasuryLimit)) {
-                                continue;
-                            }
-                            additionalHouses[lot] = extraHouseCount;
-                        }
-                    } else if (adjacentHouses > 0) {
-                        continue;
-                    }
-                    if (lot < borderStart && this.isAdjacentToWater(lot, building) && !building.getAdjacentWater()) {
-                        byWater = this.lotWithFewestAdditionalHouses(byWater, lot, additionalHouses, reservoirHits);
-                    } else if (lot < borderStart && occupiedLots == 0) {
-                        newLot = this.lotWithFewestAdditionalHouses(newLot, lot, additionalHouses, reservoirHits);
-                    } else {
-                        bestLot = this.lotWithFewestAdditionalHouses(bestLot, lot, additionalHouses, reservoirHits);
-                    }
+
+        }
+        if (selectedBuild) {
+            lot = selectedBuild.lot;
+            building = selectedBuild.building;
+            additionalHouses = selectedBuild.additionalHouses;
+            var houseLot = (lot & ~3);
+            for (var houseCount = 0; houseCount < additionalHouses; ++houseCount) {
+                while (this.buildings[houseLot] || houseLot == lot) {
+                    ++houseLot;
                 }
-                var lot = (bestLot >= 0) ? bestLot : ((newLot >= 0) ? newLot : byWater);
-                if (lot >= 0) {
-                    var houseLot = (lot & ~3);
-                    for (var houseCount = 0; houseCount < additionalHouses[lot]; ++houseCount) {
-                        while (this.buildings[houseLot] || houseLot == lot) {
-                            ++houseLot;
-                        }
-                        var problem = this.getBuildingProblem(house, houseLot);
-                        if (problem) {
-                            $('#improveCitiesOutput').append($('<div/>').text('Failed to build extra house! Problem: ' + problem).addClass('problem'));
-                            return houseCount;
-                        } else {
-                            var houseCost = this.buildingCost(house);
-                            $('#improveCitiesOutput').append($('<div/>').text('Building house in ' + this.city.name + ' for ' + houseCost + ' BP'));
-                            this.buildBuilding(house, houseLot, houseCost);
-                        }
-                    }
-                    if (lot < borderStart) {
-                        var problem = this.getBuildingProblem(building, lot);
-                        if (problem) {
-                            $('#improveCitiesOutput').append($('<div/>').text('Failed to build ' + building.name + '! Problem: ' + problem).addClass('problem'));
-                            return additionalHouses[lot];
-                        }
-                    }
-                    var cost = this.buildingCost(building);
-                    $('#improveCitiesOutput').append($('<div/>').text('Building ' + building.name + ' in ' + this.city.name + ' for ' + cost + ' BPs'));
-                    this.buildBuilding(building, lot, cost);
-                    return additionalHouses[lot] + 1;
+                var problem = this.getBuildingProblem(house, houseLot);
+                if (problem) {
+                    $('#improveCitiesOutput').append($('<div/>').text('Failed to build extra house! Problem: ' + problem).addClass('problem'));
+                    return houseCount;
+                } else {
+                    var houseCost = this.buildingCost(house);
+                    $('#improveCitiesOutput').append($('<div/>').text('Building house in ' + this.city.name + ' for ' + houseCost + ' BP'));
+                    this.buildBuilding(house, houseLot, houseCost);
                 }
             }
+            if (lot < borderStart) {
+                var problem = this.getBuildingProblem(building, lot);
+                if (problem) {
+                    $('#improveCitiesOutput').append($('<div/>').text('Failed to build ' + building.name + '! Problem: ' + problem).addClass('problem'));
+                    return additionalHouses;
+                }
+            }
+            var cost = this.buildingCost(building);
+            $('#improveCitiesOutput').append($('<div/>').text('Building ' + building.name + ' in ' + this.city.name + ' for ' + cost + ' BPs'));
+            this.buildBuilding(building, lot, cost);
+            return additionalHouses + 1;
         }
         return 0;
     },
@@ -3613,6 +3623,47 @@ $.kingdom.District = Class.create({
         } else {
             return previous;
         }
+    },
+
+    scoreAutomatedBuild: function (building, lot, additionalHouses) {
+        // Building cost should always be at least 1, but make sure.
+        var cost = Math.max(1, this.buildingCost(building));
+        // Score is a function of how good value the building is (which also benefits discounted buildings)
+        var score = this.city.kingdom.calculateIdealCost(building.getData()) / cost;
+        // Also factor in absolute cost as a fraction of current treasury
+        score *= this.city.kingdom.getTreasury() / cost;
+        // Score is lower if this building type already exists in this district
+        score /= 1 + this.countSameBuildings(building);
+        // Unrest section
+        var kingdomUnrest = parseInt(this.city.kingdom.getChoice("unrest", 0));
+        var buildingUnrest = building.getUnrest();
+        if (buildingUnrest < 0) {
+            if (kingdomUnrest + buildingUnrest < 0) {
+                // Score is lower if an unrest-reducing building doesn't give full value
+                score /= 2;
+            } else {
+                // Score is higher if it does.
+                score *= 2;
+            }
+        } else if (buildingUnrest > 0) {
+            // Score is lower if unrest is high and it's an unrest-increasing building
+            score /= kingdomUnrest + buildingUnrest;
+        }
+        // Location within the district
+        if (lot < this.sideToIndex('top')) {
+            if (this.isAdjacentToWater(lot, building) && !building.getAdjacentWater()) {
+                // Score is lower if building uses a lot adjacent to water that it doesn't need.
+                score /= 2;
+            }
+            if (this.countOccupiedLots(lot) == 0) {
+                // Score is lower if the building is starting to fill a new block.
+                score /= 2;
+            }
+        }
+        // Score is lower if the building requires additional houses be built.
+        score *= 4 / (4 + additionalHouses);
+        // Done!
+        return score;
     }
 
 });
