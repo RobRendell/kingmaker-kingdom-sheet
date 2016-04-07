@@ -961,10 +961,13 @@ $.kingdom.Kingdom = Class.create({
     exportKingdom: function () {
         var text = 'Name:' + (this.name || '') + '\n';
         $.each(this.choices.getKeys(), $.proxy(function (index, key) {
-            text += key;
-            text += ':';
-            text += this.choices.get(key);
-            text += '\n';
+            var value = this.choices.get(key);
+            if ((typeof(value) != 'number' && value && value != 'NaN') || !isNaN(value)) {
+                text += key;
+                text += ':';
+                text += value;
+                text += '\n';
+            }
         }, this));
         return text;
     },
@@ -1096,7 +1099,7 @@ $.kingdom.Kingdom = Class.create({
             }
             var cityIndex = parseInt(Math.random() * cityNames.length)
             var city = this.cities[cityNames[cityIndex]];
-            var numBuilt = city.automatedImprovement(buildings, treasuryLimit, buildingLimit, extraHouse, !userBuildings);
+            var numBuilt = city.automatedImprovement(buildings, goal, treasuryLimit, buildingLimit, extraHouse, !userBuildings);
             if (!numBuilt) {
                 cityNames.splice(cityIndex, 1);
             } else if (extraHouse && (numBuilt > 1 || buildingLimit == 0)) {
@@ -3509,7 +3512,7 @@ $.kingdom.District = Class.create({
         return count;
     },
 
-    automatedImprovementFromList: function (list, treasuryLimit, buildingLimit, extraHouse, allowDuplicate) {
+    automatedImprovementFromList: function (list, goal, treasuryLimit, buildingLimit, extraHouse, allowDuplicate) {
         var house = $.kingdom.Building.get('House');
         var landBorder = $.kingdom.Building.get('Land');
         var borderStart = this.sideToIndex('top');
@@ -3567,7 +3570,7 @@ $.kingdom.District = Class.create({
             }
             var lot = (bestLot >= 0) ? bestLot : ((newLot >= 0) ? newLot : byWater);
             if (lot >= 0) {
-                var score = this.scoreAutomatedBuild(building, lot, additionalHouses[lot]);
+                var score = this.scoreAutomatedBuild(building, lot, additionalHouses[lot], goal);
                 if (score > 0) {
                     hits += score;
                     if (Math.random()*hits < score) {
@@ -3625,13 +3628,17 @@ $.kingdom.District = Class.create({
         }
     },
 
-    scoreAutomatedBuild: function (building, lot, additionalHouses) {
+    scoreAutomatedBuild: function (building, lot, additionalHouses, goal) {
         // Building cost should always be at least 1, but make sure.
         var cost = Math.max(1, this.buildingCost(building));
         // Score is a function of how good value the building is (which also benefits discounted buildings)
         var score = this.city.kingdom.calculateIdealCost(building.getData()) / cost;
         // Also factor in absolute cost as a fraction of current treasury
         score *= this.city.kingdom.getTreasury() / cost;
+        // Favour buildings with higher values for the goal attribute
+        if (goal) {
+            score *= Math.abs(building.getData()[goal]);
+        }
         // Score is lower if this building type already exists in this district
         score /= 1 + this.countSameBuildings(building);
         // Unrest section
@@ -3722,9 +3729,14 @@ $.kingdom.City = Class.create({
                 [0, 0]
             ];
         this.districts = [];
-        for (var index = 0; index < this.districtMap.length; ++index) {
+        var index;
+        for (index = 0; index < this.districtMap.length; ++index) {
             var district = new $.kingdom.District(this, index);
             this.districts.push(district);
+        }
+        while (this.kingdom.getChoice(this.getId(index))) {
+            this.kingdom.clearChoice(this.getId(index));
+            index++;
         }
         this.itemSlots['minor'] = $.kingdom.MagicItem.loadArray(this.getId("minorItems"), this.kingdom);
         this.itemSlots['medium'] = $.kingdom.MagicItem.loadArray(this.getId("mediumItems"), this.kingdom);
@@ -3986,12 +3998,12 @@ $.kingdom.City = Class.create({
         return result;
     },
 
-    automatedImprovement: function (buildings, treasuryLimit, buildingLimit, extraHouse, allowDuplicate) {
+    automatedImprovement: function (buildings, goal, treasuryLimit, buildingLimit, extraHouse, allowDuplicate) {
         var districtShuffle = (this.districts.length - 1).numberRange();
         districtShuffle.shuffle();
         for (var index = 0; index < districtShuffle.length; ++index) {
             var district = this.districts[districtShuffle[index]];
-            var numBuilt = district.automatedImprovementFromList(buildings, treasuryLimit, buildingLimit, extraHouse, allowDuplicate);
+            var numBuilt = district.automatedImprovementFromList(buildings, goal, treasuryLimit, buildingLimit, extraHouse, allowDuplicate);
             if (numBuilt > 0) {
                 return numBuilt;
             }

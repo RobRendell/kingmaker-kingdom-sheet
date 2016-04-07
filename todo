@@ -1,7 +1,4 @@
 
-* Importing an old version of a kingdom, newer data saved in local storage can be loaded (e.g. build & populate a new
-    city district, import older version, build same district again -> loads buildings previously set there).
-
 * thrown melee weapons which can have both types of enhancements
 
 Generalise not adjacent to to take a list of buildings
