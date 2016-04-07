@@ -637,8 +637,8 @@ $.kingdom.Kingdom = Class.create({
             }
         }, this));
         $('#improveCitiesButton').click($.proxy(function () {
-            var buildings = this.getChoice('improveCitiesBuildings');
-            var treasuryLimit = parseInt(this.getChoice('improveCitiesTreasuryLimit'));
+            var buildings = this.getChoice('improveCitiesBuildings', '');
+            var treasuryLimit = parseInt(this.getChoice('improveCitiesTreasuryLimit', 0));
             if ($('#freeBuildCheckbox').prop('checked')) {
                 $('#improveCitiesOutput').append($('<div/>').text('Error: cannot auto-improve cities in free build mode.').addClass('problem'));
             } else {
