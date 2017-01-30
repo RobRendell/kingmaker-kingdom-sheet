@@ -9,282 +9,282 @@
 
     <div id="menu">Menu</div>
     <div id="menuDiv">
-	<span>Switch to kingdom:</span>
-	<div id="kingdomList"></div>
-	<hr/>
-	<a href="#" id="menuNewKingdom">Create New Kingdom</a><br/>
-	<a href="#" id="menuImportExport">Import/Export Kingdom</a><br/>
-	<a href="#" id="menuHouseRules">Configure Kingdom Rules</a>
+        <span>Switch to kingdom:</span>
+        <div id="kingdomList"></div>
+        <hr/>
+        <a href="#" id="menuNewKingdom">Create New Kingdom</a><br/>
+        <a href="#" id="menuImportExport">Import/Export Kingdom</a><br/>
+        <a href="#" id="menuHouseRules">Configure Kingdom Rules</a>
     </div>
     <div class="hiddenPanel" id="importExportDiv">
-	<p>Copy and paste into and out of this text area to export the current kingdom or import a new or existing kingdom</p>
-	<textarea name="importExportArea">
-	</textarea><br/>
-	<button id="importExportClose">Close</button>
-	<button id="importButton">Import above kingdom data</button>
+        <p>Copy and paste into and out of this text area to export the current kingdom or import a new or existing kingdom</p>
+        <textarea name="importExportArea">
+        </textarea><br/>
+        <button id="importExportClose">Close</button>
+        <button id="importButton">Import above kingdom data</button>
     </div>
     <div id="titleDiv"></div>
 
     <span class="topCalendar"><span class="calendar">Calendar</span><button class="calendarMinus">-</button><button class="calendarPlus">+</button></span>
 
     <div class="hiddenPanel" id="houseRulesDiv">
-	<h3>Configure the house rules that apply to this kingdom</h3>
-	<p>Which base ruleset does this kingdom use?
-	    <select id="hrRuleset">
-		<option value="RRR">Rivers Run Red</option>
-		<option value="UC">Ultimate Campaign</option>
-	    </select>
-	</p>
-	<div id="hrRRROnly">
-	    <p><label><input type="checkbox" id="hrMansionVilla"> Mansions and Noble Villas are considered houses.</label></p>
-	</div>
-	<div id="hrUCOnly">
-	</div>
-	<p><label><input type="checkbox" id="hrCalculateEconomyBoost"> Magic item slots simply boost Economy instead of filling with items that you roll to sell each turn.</label></p>
-	<p><label><input type="checkbox" id="hrCalculatePrice"> Building prices are calculated from their features.</label></p>
-	<button id="houseRulesClose">Close</button>
+        <h3>Configure the house rules that apply to this kingdom</h3>
+        <p>Which base ruleset does this kingdom use?
+            <select id="hrRuleset">
+                <option value="RRR">Rivers Run Red</option>
+                <option value="UC">Ultimate Campaign</option>
+            </select>
+        </p>
+        <div id="hrRRROnly">
+            <p><label><input type="checkbox" id="hrMansionVilla"> Mansions and Noble Villas are considered houses.</label></p>
+        </div>
+        <div id="hrUCOnly">
+        </div>
+        <p><label><input type="checkbox" id="hrCalculateEconomyBoost"> Magic item slots simply boost Economy instead of filling with items that you roll to sell each turn.</label></p>
+        <p><label><input type="checkbox" id="hrCalculatePrice"> Building prices are calculated from their features.</label></p>
+        <button id="houseRulesClose">Close</button>
     </div>
 
     <h1><span id="kingdomType">Barony</span> of <span id="kingdomName"></span></h1>
 
     <div class="summary">
 
-	<table class="blue">
+        <table class="blue">
 
-	    <tr>
-		<th>Alignment</th>
-		<td>
-		    <select name="Alignment">
-			<option></option>
-			<option>Lawful Good</option>
-			<option>Neutral Good</option>
-			<option>Chaotic Good</option>
-			<option>Lawful Neutral</option>
-			<option>True Neutral</option>
-			<option>Chaotic Neutral</option>
-			<option>Lawful Evil</option>
-			<option>Neutral Evil</option>
-			<option>Chaotic Evil</option>
-		    </select>
-		</td>
-	    </tr>
+            <tr>
+                <th>Alignment</th>
+                <td>
+                    <select name="Alignment">
+                        <option></option>
+                        <option>Lawful Good</option>
+                        <option>Neutral Good</option>
+                        <option>Chaotic Good</option>
+                        <option>Lawful Neutral</option>
+                        <option>True Neutral</option>
+                        <option>Chaotic Neutral</option>
+                        <option>Lawful Evil</option>
+                        <option>Neutral Evil</option>
+                        <option>Chaotic Evil</option>
+                    </select>
+                </td>
+            </tr>
 
-	    <tr>
-		<th>Size</th>
-		<td><input type="text" name="size" value="1" size="4" /></td>
-	    </tr>
+            <tr>
+                <th>Size</th>
+                <td><input type="text" name="size" value="1" size="4" /></td>
+            </tr>
 
-	    <tr>
-		<th>Roads</th>
-		<td><select name="roads"></select></td>
-	    </tr>
+            <tr>
+                <th>Roads</th>
+                <td><select name="roads"></select></td>
+            </tr>
 
-	    <tr>
-		<th>Farms</th>
-		<td><select name="farms"></select></td>
-	    </tr>
+            <tr>
+                <th>Farms</th>
+                <td><select name="farms"></select></td>
+            </tr>
 
-	    <tr>
-		<th>Unrest</th>
-		<td><input type="text" name="unrest" value="0" size="1" /> (<span class="fromKingdom UnrestRate plusNumber"></span> each month)</td>
-	    </tr>
+            <tr>
+                <th>Unrest</th>
+                <td><input type="text" name="unrest" value="0" size="1" /> (<span class="fromKingdom UnrestRate plusNumber"></span> each month)</td>
+            </tr>
 
-	    <tr>
-		<th>Treasury</th>
-		<td><input type="text" name="treasury" value="0" size="4" /> BP</td>
-	    </tr>
+            <tr>
+                <th>Treasury</th>
+                <td><input type="text" name="treasury" value="0" size="4" /> BP</td>
+            </tr>
 
-	</table>
+        </table>
 
     </div>
 
     <div class="edicts">
 
-	<table class="blue">
+        <table class="blue">
 
-	    <tr>
-		<th>Control DC</th>
-		<td class="fromKingdom ControlDC"></td>
-	    </tr>
+            <tr>
+                <th>Control DC</th>
+                <td class="fromKingdom ControlDC"></td>
+            </tr>
 
-	    <tr>
-		<th>Population</th>
-		<td><span class="fromKingdom Population number"></span> (<span class="fromKingdom City_Population number"></span> urban, <span class="fromKingdom Rural_Population number"></span> rural)</td>
-	    </tr>
+            <tr>
+                <th>Population</th>
+                <td><span class="fromKingdom Population number"></span> (<span class="fromKingdom City_Population number"></span> urban, <span class="fromKingdom Rural_Population number"></span> rural)</td>
+            </tr>
 
-	    <tr>
-		<th>Consumption</th>
-		<td><span class="fromKingdom Consumption number"></span> <span class="fromKingdom Consumption_Actual"></span></td>
-	    </tr>
+            <tr>
+                <th>Consumption</th>
+                <td><span class="fromKingdom Consumption number"></span> <span class="fromKingdom Consumption_Actual"></span></td>
+            </tr>
 
-	</table>
+        </table>
 
-	<table class="blue">
+        <table class="blue">
 
-	    <thead>
+            <thead>
 
-		<tr>
-		    <th>Edicts</th>
-		    <th>Choice</th>
-		    <th>Economy</th>
-		    <th>Loyalty</th>
-		    <th>Stability</th>
-		    <th>Consumption</th>
-		</tr>
+                <tr>
+                    <th>Edicts</th>
+                    <th>Choice</th>
+                    <th>Economy</th>
+                    <th>Loyalty</th>
+                    <th>Stability</th>
+                    <th>Consumption</th>
+                </tr>
 
-	    </thead>
+            </thead>
 
-	    <tbody>
+            <tbody>
 
-		<tr>
-		    <th>Promotions</th>
-		    <td>
-			<select name="Promotions">
-			    <option>None</option>
-			    <option>Token</option>
-			    <option>Standard</option>
-			    <option>Aggressive</option>
-			    <option>Expansionist</option>
-			</select>
-		    </td>
-		    <td></td>
-		    <td></td>
-		    <td class="fromKingdom Edicts_Stability"></td>
-		    <td class="fromKingdom Promotions_Consumption"></td>
-		</tr>
+                <tr>
+                    <th>Promotions</th>
+                    <td>
+                        <select name="Promotions">
+                            <option>None</option>
+                            <option>Token</option>
+                            <option>Standard</option>
+                            <option>Aggressive</option>
+                            <option>Expansionist</option>
+                        </select>
+                    </td>
+                    <td></td>
+                    <td></td>
+                    <td class="fromKingdom Edicts_Stability"></td>
+                    <td class="fromKingdom Promotions_Consumption"></td>
+                </tr>
 
-		<tr>
-		    <th>Taxation Level</th>
-		    <td>
-			<select name="Taxation">
-			    <option>None</option>
-			    <option>Light</option>
-			    <option>Normal</option>
-			    <option>Heavy</option>
-			    <option>Overwhelming</option>
-			</select>
-		    </td>
-		    <td class="fromKingdom Edicts_Economy"></td>
-		    <td class="fromKingdom Taxation_Loyalty"></td>
-		    <td></td>
-		    <td></td>
-		</tr>
+                <tr>
+                    <th>Taxation Level</th>
+                    <td>
+                        <select name="Taxation">
+                            <option>None</option>
+                            <option>Light</option>
+                            <option>Normal</option>
+                            <option>Heavy</option>
+                            <option>Overwhelming</option>
+                        </select>
+                    </td>
+                    <td class="fromKingdom Edicts_Economy"></td>
+                    <td class="fromKingdom Taxation_Loyalty"></td>
+                    <td></td>
+                    <td></td>
+                </tr>
 
-		<tr>
-		    <th>Festivals per year</th>
-		    <td>
-			<select name="Festivals">
-			    <option>None</option>
-			    <option>1 per year</option>
-			    <option>6 per year</option>
-			    <option>12 per year</option>
-			    <option>23 per year</option>
-			</select>
-		    </td>
-		    <td></td>
-		    <td class="fromKingdom Festivals_Loyalty"></td>
-		    <td></td>
-		    <td class="fromKingdom Festivals_Consumption"></td>
-		</tr>
+                <tr>
+                    <th>Festivals per year</th>
+                    <td>
+                        <select name="Festivals">
+                            <option>None</option>
+                            <option>1 per year</option>
+                            <option>6 per year</option>
+                            <option>12 per year</option>
+                            <option>23 per year</option>
+                        </select>
+                    </td>
+                    <td></td>
+                    <td class="fromKingdom Festivals_Loyalty"></td>
+                    <td></td>
+                    <td class="fromKingdom Festivals_Consumption"></td>
+                </tr>
 
-	    </tbody>
+            </tbody>
 
-	</table>
+        </table>
 
     </div>
 
 
     <table class="blue">
 
-	<tr>
-	    <th>&nbsp;</th>
-	    <th>Total</th>
-	    <th>Buildings</th>
-	    <th>Edicts</th>
-	    <th>Events</th>
-	    <th>Leadership</th>
-	    <th>Resources</th>
-	    <th>Alignment</th>
-	    <th>Roads</th>
-	    <th>Other</th>
-	    <th>Edicts</th>
-	    <th>Unrest</th>
-	    <th>Vacancies</th>
-	    <th>Other</th>
-	</tr>
+        <tr>
+            <th>&nbsp;</th>
+            <th>Total</th>
+            <th>Buildings</th>
+            <th>Edicts</th>
+            <th>Events</th>
+            <th>Leadership</th>
+            <th>Resources</th>
+            <th>Alignment</th>
+            <th>Roads</th>
+            <th>Other</th>
+            <th>Edicts</th>
+            <th>Unrest</th>
+            <th>Vacancies</th>
+            <th>Other</th>
+        </tr>
 
-	<tr>
-	    <th>Economy</th>
-	    <td class="fromKingdom Economy"></td>
-	    <td class="fromKingdom Buildings_Economy"></td>
-	    <td class="fromKingdom Edicts_Economy_Plus"></td>
-	    <td class="fromKingdom Events_Economy"></td>
-	    <td class="fromKingdom Leadership_Economy"></td>
-	    <td class="fromKingdom Resources_Economy"></td>
-	    <td class="fromKingdom Alignment_Economy"></td>
-	    <td class="fromKingdom Roads_Economy"></td>
-	    <td class="fromKingdom Other_Economy_Plus"></td>
-	    <td class="fromKingdom Edicts_Economy_Minus"></td>
-	    <td class="fromKingdom Unrest_Economy_Minus"></td>
-	    <td class="fromKingdom Vacancies_Economy_Minus"></td>
-	    <td class="fromKingdom Other_Economy_Minus"></td>
-	</tr>
+        <tr>
+            <th>Economy</th>
+            <td class="fromKingdom Economy"></td>
+            <td class="fromKingdom Buildings_Economy"></td>
+            <td class="fromKingdom Edicts_Economy_Plus"></td>
+            <td class="fromKingdom Events_Economy"></td>
+            <td class="fromKingdom Leadership_Economy"></td>
+            <td class="fromKingdom Resources_Economy"></td>
+            <td class="fromKingdom Alignment_Economy"></td>
+            <td class="fromKingdom Roads_Economy"></td>
+            <td class="fromKingdom Other_Economy_Plus"></td>
+            <td class="fromKingdom Edicts_Economy_Minus"></td>
+            <td class="fromKingdom Unrest_Economy_Minus"></td>
+            <td class="fromKingdom Vacancies_Economy_Minus"></td>
+            <td class="fromKingdom Other_Economy_Minus"></td>
+        </tr>
 
-	<tr>
-	    <th>Loyalty</th>
-	    <td class="fromKingdom Loyalty"></td>
-	    <td class="fromKingdom Buildings_Loyalty"></td>
-	    <td class="fromKingdom Edicts_Loyalty_Plus"></td>
-	    <td class="fromKingdom Events_Loyalty"></td>
-	    <td class="fromKingdom Leadership_Loyalty"></td>
-	    <td class="fromKingdom Resources_Loyalty"></td>
-	    <td class="fromKingdom Alignment_Loyalty"></td>
-	    <td class="fromKingdom Roads_Loyalty"></td>
-	    <td class="fromKingdom Other_Loyalty_Plus"></td>
-	    <td class="fromKingdom Edicts_Loyalty_Minus"></td>
-	    <td class="fromKingdom Unrest_Loyalty_Minus"></td>
-	    <td class="fromKingdom Vacancies_Loyalty_Minus"></td>
-	    <td class="fromKingdom Other_Loyalty_Minus"></td>
-	</tr>
+        <tr>
+            <th>Loyalty</th>
+            <td class="fromKingdom Loyalty"></td>
+            <td class="fromKingdom Buildings_Loyalty"></td>
+            <td class="fromKingdom Edicts_Loyalty_Plus"></td>
+            <td class="fromKingdom Events_Loyalty"></td>
+            <td class="fromKingdom Leadership_Loyalty"></td>
+            <td class="fromKingdom Resources_Loyalty"></td>
+            <td class="fromKingdom Alignment_Loyalty"></td>
+            <td class="fromKingdom Roads_Loyalty"></td>
+            <td class="fromKingdom Other_Loyalty_Plus"></td>
+            <td class="fromKingdom Edicts_Loyalty_Minus"></td>
+            <td class="fromKingdom Unrest_Loyalty_Minus"></td>
+            <td class="fromKingdom Vacancies_Loyalty_Minus"></td>
+            <td class="fromKingdom Other_Loyalty_Minus"></td>
+        </tr>
 
-	<tr>
-	    <th>Stability</th>
-	    <td class="fromKingdom Stability"></td>
-	    <td class="fromKingdom Buildings_Stability"></td>
-	    <td class="fromKingdom Edicts_Stability_Plus"></td>
-	    <td class="fromKingdom Events_Stability"></td>
-	    <td class="fromKingdom Leadership_Stability"></td>
-	    <td class="fromKingdom Resources_Stability"></td>
-	    <td class="fromKingdom Alignment_Stability"></td>
-	    <td class="fromKingdom Roads_Stability"></td>
-	    <td class="fromKingdom Other_Stability_Plus"></td>
-	    <td class="fromKingdom Edicts_Stability_Minus"></td>
-	    <td class="fromKingdom Unrest_Stability_Minus"></td>
-	    <td class="fromKingdom Vacancies_Stability_Minus"></td>
-	    <td class="fromKingdom Other_Stability_Minus"></td>
-	</tr>
+        <tr>
+            <th>Stability</th>
+            <td class="fromKingdom Stability"></td>
+            <td class="fromKingdom Buildings_Stability"></td>
+            <td class="fromKingdom Edicts_Stability_Plus"></td>
+            <td class="fromKingdom Events_Stability"></td>
+            <td class="fromKingdom Leadership_Stability"></td>
+            <td class="fromKingdom Resources_Stability"></td>
+            <td class="fromKingdom Alignment_Stability"></td>
+            <td class="fromKingdom Roads_Stability"></td>
+            <td class="fromKingdom Other_Stability_Plus"></td>
+            <td class="fromKingdom Edicts_Stability_Minus"></td>
+            <td class="fromKingdom Unrest_Stability_Minus"></td>
+            <td class="fromKingdom Vacancies_Stability_Minus"></td>
+            <td class="fromKingdom Other_Stability_Minus"></td>
+        </tr>
 
     </table>
 
     <table class="blue">
 
-	<tr>
-	    <th>&nbsp;</th>
-	    <th>New Cities</th>
-	    <th>New Buildings</th>
-	    <th>Claim Hexes (1 BP)</th>
-	    <th title="Plains and Hills 1 BP, Forests 2 BP, Swamps and Mountains 4 BP, double to cross a river without an existing bridge or ford">Build Roads (1/2/4/8 BP)</th>
-	    <th title="Plains 2 BP, Hills 4 BP">Build Farmlands (2/4 BP)</th>
-	</tr>
+        <tr>
+            <th>&nbsp;</th>
+            <th>New Cities</th>
+            <th>New Buildings</th>
+            <th>Claim Hexes (1 BP)</th>
+            <th title="Plains and Hills 1 BP, Forests 2 BP, Swamps and Mountains 4 BP, double to cross a river without an existing bridge or ford">Build Roads (1/2/4/8 BP)</th>
+            <th title="Plains 2 BP, Hills 4 BP">Build Farmlands (2/4 BP)</th>
+        </tr>
 
-	<tr>
-	    <th>Build Limits (per month)</th>
-	    <td class="fromKingdom limitCities"></td>
-	    <td><span class="fromKingdom limitBuildings"></span> (+1 house)</td>
-	    <td class="fromKingdom limitHexes"></td>
-	    <td class="fromKingdom limitRoads"></td>
-	    <td class="fromKingdom limitFarmlands"></td>
-	</tr>
+        <tr>
+            <th>Build Limits (per month)</th>
+            <td class="fromKingdom limitCities"></td>
+            <td><span class="fromKingdom limitBuildings"></span> (+1 house)</td>
+            <td class="fromKingdom limitHexes"></td>
+            <td class="fromKingdom limitRoads"></td>
+            <td class="fromKingdom limitFarmlands"></td>
+        </tr>
 
     </table>
 
@@ -292,17 +292,17 @@
 
     <table class="blue leaders">
 
-	<thead>
-	    <tr>
-		<th>Position</th>
-		<th>Who</th>
-		<th>Ability</th>
-		<th>Affecting</th>
-		<th>Penalty if Vacant</th>
-	    </tr>
-	</thead>
+        <thead>
+            <tr>
+                <th>Position</th>
+                <th>Who</th>
+                <th>Ability</th>
+                <th>Affecting</th>
+                <th>Penalty if Vacant</th>
+            </tr>
+        </thead>
 
-	<tbody></tbody>
+        <tbody></tbody>
 
     </table>
 
@@ -310,29 +310,29 @@
 
     <div>
 
-	<table class="blue people">
+        <table class="blue people">
 
-	    <thead>
+            <thead>
 
-		<tr>
-		    <th>Name</th>
-		    <th>Strength</th>
-		    <th>Dexterity</th>
-		    <th>Constitution</th>
-		    <th>Intelligence</th>
-		    <th>Wisdom</th>
-		    <th>Charisma</th>
-		</tr>
+                <tr>
+                    <th>Name</th>
+                    <th>Strength</th>
+                    <th>Dexterity</th>
+                    <th>Constitution</th>
+                    <th>Intelligence</th>
+                    <th>Wisdom</th>
+                    <th>Charisma</th>
+                </tr>
 
-	    </thead>
+            </thead>
 
-	    <tbody>
+            <tbody>
 
-	    </tbody>
+            </tbody>
 
-	</table>
+        </table>
 
-	<input type="button" value="Add person" id="addPersonButton" />
+        <input type="button" value="Add person" id="addPersonButton" />
 
     </div>
 
@@ -340,11 +340,11 @@
 
     <div>
 
-	<div id="citiesDiv"></div>
+        <div id="citiesDiv"></div>
 
-	<div id="buildSelect"></div>
+        <div id="buildSelect"></div>
 
-	<input type="button" value="Add new city" id="addCityButton" /> <label>Free build mode: <input type="checkbox" id="freeBuildCheckbox" /></label>
+        <input type="button" value="Add new city" id="addCityButton" /> <label>Free build mode: <input type="checkbox" id="freeBuildCheckbox" /></label>
 
     </div>
 
@@ -352,26 +352,26 @@
 
     <div>
 
-	<table class="blue resources">
+        <table class="blue resources">
 
-	    <thead>
+            <thead>
 
-		<tr>
-		    <th>Description</th>
-		    <th>Economy</th>
-		    <th>Loyalty</th>
-		    <th>Stability</th>
-		</tr>
+                <tr>
+                    <th>Description</th>
+                    <th>Economy</th>
+                    <th>Loyalty</th>
+                    <th>Stability</th>
+                </tr>
 
-	    </thead>
+            </thead>
 
-	    <tbody>
+            <tbody>
 
-	    </tbody>
+            </tbody>
 
-	</table>
+        </table>
 
-	<input type="button" value="Add Resource" id="addResourceButton" />
+        <input type="button" value="Add Resource" id="addResourceButton" />
 
     </div>
 
@@ -379,121 +379,124 @@
 
     <div>
 
-	<table class="blue armies">
+        <table class="blue armies">
 
-	    <thead>
+            <thead>
 
-		<tr>
-		    <th>Name</th>
-		    <th>Creatures</th>
-		    <th>Size</th>
-		    <th>ACR</th>
-		    <th>DV</th>
-		    <th>OM</th>
-		    <th>Speed</th>
-		    <th>Consumption</th>
-		    <th>Active</th>
-		    <th>Morale</th>
-		    <th>Hitpoints</th>
-		    <th>Notes</th>
-		</tr>
+                <tr>
+                    <th>Name</th>
+                    <th>Creatures</th>
+                    <th>Size</th>
+                    <th>ACR</th>
+                    <th>DV</th>
+                    <th>OM</th>
+                    <th>Speed</th>
+                    <th>Consumption</th>
+                    <th>Active</th>
+                    <th>Morale</th>
+                    <th>Hitpoints</th>
+                    <th>Notes</th>
+                </tr>
 
-	    </thead>
+            </thead>
 
-	    <tbody>
+            <tbody>
 
-	    </tbody>
+            </tbody>
 
-	</table>
+        </table>
 
-	<input type="button" value="Add Army" id="addArmyButton" />
+        <input type="button" value="Add Army" id="addArmyButton" />
 
     </div>
 
-	<h1>Kingdom Turn <span class="expando">[+]</span></h1>
-	<div>
-		<div class="RRR">
-			<ol start="0">
-				<li>Advance calendar month: <span class="calendar">Calendar</span><button class="calendarMinus">-</button><button class="calendarPlus">+</button></li>
-				<li>Upkeep Phase
-					<ol type="a">
-						<li><input type="button" value="Determine Kingdom Stability" id="turnStabilityCheck" />
-							<div id="turnStabilityOutput" class="output"></div>
-						</li>
-						<li><input type="button" value="Pay Consumption" id="payConsumptionButton" />
-							<div id="payConsumptionOutput" class="output"></div>
-						</li>
-						<li><input type="button" value="Fill Vacant Magic Item Slots" id="fillItemSlots" />
-							<div id="fillItemSlotsOutput" class="output"></div>
-						</li>
-						<li>Deal With Unrest (if unrest is 11 or higher).</li>
-					</ol>
-				</li>
-				<li>Improvement Phase
-					<ol type="a">
-						<li>Assign Leadership Roles</li>
-						<li>Claim Hexes (limit of <span class="fromKingdom limitHexes"></span> per month)
-							<input type="button" value="Claim one hex for 1 BP" id="claimHexButton"/>
-							<div id="claimHexOutput" class="output"></div>
-						</li>
-						<li><span>Improve Hexes <span class="expando">[-]</span></span>
-							<ul>
-								<li>
-									Build roads (limit of <span class="fromKingdom limitRoads"></span> per month):
-									<ul>
-										<li>
-											Just roads:
-											<input type="button" value="plains/hills (1 BP)" name="1" class="buildRoadButton"/>
-											<input type="button" value="forest (2 BP)" name="2" class="buildRoadButton"/>
-											<input type="button" value="swamps/mountains (4 BP)" name="4" class="buildRoadButton"/>
-										</li>
-										<li>
-											Plus bridge:
-											<input type="button" value="plains/hills with river (2 BP)" name="2" class="buildRoadButton"/>
-											<input type="button" value="forest with river (4 BP)" name="4" class="buildRoadButton"/>
-											<input type="button" value="swamps/mountains with river (8 BP)" name="8" class="buildRoadButton"/>
-										</li>
-									</ul>
-								</li>
-								<li>
-									Build farms (limit of <span class="fromKingdom limitFarmlands"></span> per month):
-									<input type="button" value="plains (2 BP)" name="2" class="buildFarmButton"/>
-									<input type="button" value="hills (4 BP)" name="4" class="buildFarmButton"/>
-								</li>
-							</ul>
-							<div id="improveHexOutput" class="output"></div>
-						</li>
-						<li><span>Establish and Improve Cities <span class="expando">[-]</span></span>
-							<div class="indent">
-								Improvements for every district (comma-separated list of building names): <input type="text" name="improveCitiesBuildings" size="60" /><br/>
-								Keep treasury above: <input type="text" name="improveCitiesTreasuryLimit" size="4"/> BPs<br/>
-								Keep Loyalty and Stability ahead of Command DC by: <input type="text" name="improveCitiesMargin" size="4"/><br/>
-								Remaining builds this month: <span class="fromKingdom limitBuildingsCurrent"></span> <span class="fromKingdom extraHouse"></span><br/>
-								<input type="button" value="Improve cities" id="improveCitiesButton" />
-								<div id="improveCitiesOutput" class="output"></div>
-							</div>
-						</li>
-						<li>Edicts</li>
-					</ol>
-				</li>
-				<li>Income Phase
-					<ol type="a">
-						<li>Deposits</li>
-						<li>Withdrawals</li>
-						<li>Sell Valuable Items
-							<input type="button" value="Empty item slots with cheap items" id="emptyItemSlots" />
-							<input type="button" value="Sell most valuable magic items" id="sellItemSlots" />
-							<div id="valuableItemOutput" class="output"></div>
-						</li>
-						<li><input type="button" value="Generate Income" id="generateIncomeButton" />
-							<div id="generateIncomeOutput" class="output"></div>
-						</li>
-					</ol>
-				</li>
-				<li>Event Phase</li>
-			</ol>
-		</div>
-	</div>
+        <h1>Kingdom Turn <span class="expando">[+]</span></h1>
+        <div>
+            <div class="RRR">
+                <ol start="0">
+                    <li>Advance calendar month: <span class="calendar">Calendar</span>
+                        <button class="calendarMinus">-</button>
+                        <button class="calendarPlus">+</button>
+                    </li>
+                    <li>Upkeep Phase
+                        <ol type="a">
+                            <li><input type="button" value="Determine Kingdom Stability" id="turnStabilityCheck"/>
+                                <div id="turnStabilityOutput" class="output"></div>
+                            </li>
+                            <li><input type="button" value="Pay Consumption" id="payConsumptionButton"/>
+                                <div id="payConsumptionOutput" class="output"></div>
+                            </li>
+                            <li><input type="button" value="Fill Vacant Magic Item Slots" id="fillItemSlots"/>
+                                <div id="fillItemSlotsOutput" class="output"></div>
+                            </li>
+                            <li>Deal With Unrest (if unrest is 11 or higher).</li>
+                        </ol>
+                    </li>
+                    <li>Improvement Phase
+                        <ol type="a">
+                            <li>Assign Leadership Roles</li>
+                            <li>Claim Hexes (limit of <span class="fromKingdom limitHexes"></span> per month)
+                                <input type="button" value="Claim one hex for 1 BP" id="claimHexButton"/>
+                                <div id="claimHexOutput" class="output"></div>
+                            </li>
+                            <li><span>Improve Hexes <span class="expando">[-]</span></span>
+                                <ul>
+                                    <li>
+                                        Build roads (limit of <span class="fromKingdom limitRoads"></span> per month):
+                                        <ul>
+                                            <li>
+                                                Just roads:
+                                                <input type="button" value="plains/hills (1 BP)" name="1" class="buildRoadButton"/>
+                                                <input type="button" value="forest (2 BP)" name="2" class="buildRoadButton"/>
+                                                <input type="button" value="swamps/mountains (4 BP)" name="4" class="buildRoadButton"/>
+                                            </li>
+                                            <li>
+                                                Plus bridge:
+                                                <input type="button" value="plains/hills with river (2 BP)" name="2" class="buildRoadButton"/>
+                                                <input type="button" value="forest with river (4 BP)" name="4" class="buildRoadButton"/>
+                                                <input type="button" value="swamps/mountains with river (8 BP)" name="8" class="buildRoadButton"/>
+                                            </li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        Build farms (limit of <span class="fromKingdom limitFarmlands"></span> per month):
+                                        <input type="button" value="plains (2 BP)" name="2" class="buildFarmButton"/>
+                                        <input type="button" value="hills (4 BP)" name="4" class="buildFarmButton"/>
+                                    </li>
+                                </ul>
+                                <div id="improveHexOutput" class="output"></div>
+                            </li>
+                            <li><span>Establish and Improve Cities <span class="expando">[-]</span></span>
+                                <div class="indent">
+                                    Improvements for every district (comma-separated list of building names): <input type="text" name="improveCitiesBuildings" size="60"/><br/>
+                                    Keep treasury above: <input type="text" name="improveCitiesTreasuryLimit" size="4"/> BPs<br/>
+                                    Keep Loyalty and Stability ahead of Command DC by: <input type="text" name="improveCitiesMargin" size="4"/><br/>
+                                    Remaining builds this month: <span class="fromKingdom limitBuildingsCurrent"></span> <span class="fromKingdom extraHouse"></span><br/>
+                                    <input type="button" value="Improve cities" id="improveCitiesButton"/>
+                                    <div id="improveCitiesOutput" class="output"></div>
+                                </div>
+                            </li>
+                            <li>Edicts</li>
+                        </ol>
+                    </li>
+                    <li>Income Phase
+                        <ol type="a">
+                            <li>Deposits</li>
+                            <li>Withdrawals</li>
+                            <li>Sell Valuable Items
+                                <input type="button" value="Empty item slots with cheap items" id="emptyItemSlots"/>
+                                <input type="button" value="Sell most valuable magic items" id="sellItemSlots"/>
+                                <div id="valuableItemOutput" class="output"></div>
+                            </li>
+                            <li><input type="button" value="Generate Income" id="generateIncomeButton"/>
+                                <div id="generateIncomeOutput" class="output"></div>
+                            </li>
+                        </ol>
+                    </li>
+                    <li>Event Phase</li>
+                </ol>
+            </div>
+        </div>
 
 </body>
 </html>

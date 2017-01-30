@@ -557,7 +557,7 @@ $.kingdom.Kingdom = Class.create({
         this.peopleTable = new $.kingdom.PeopleTable(this);
         this.leaderTable = new $.kingdom.LeaderTable(this, this.peopleTable);
         this.resourceTable = new $.kingdom.ResourceTable(this);
-	this.armyTable = new $.kingdom.ArmyTable(this);
+        this.armyTable = new $.kingdom.ArmyTable(this);
         // load appropriate rules
         this.houseRulesBuildings();
         // load cities
@@ -946,7 +946,7 @@ $.kingdom.Kingdom = Class.create({
         this.taxation.apply();
         this.festivals.apply();
 
-    	// armies
+            // armies
         this.armyTable.apply();
 
         // global factors
@@ -2998,7 +2998,7 @@ $.kingdom.Ruin = Class.create({
     },
 
     getIsHouse: function () {
-	return false;
+        return false;
     },
 
     getNoAdjacentHouses: function () {
@@ -4340,7 +4340,7 @@ $.kingdom.CityBuilder = Class.create({
     close: function (evt) {
         $(document).unbind('click.buildMenu');
         this.menu.hide();
-    	$('#titleDiv').hide();
+            $('#titleDiv').hide();
         $(this.target).removeClass("buildingSite");
         this.district = null;
         if (evt) {
@@ -5626,9 +5626,9 @@ $.kingdom.Army = Class.create({
     },
 
     apply: function () {
-	var consumption = parseInt(this.stats['Consumption']) || 0;
-	if (this.stats['Active'] == "true")
-	    consumption *= 4;
+        var consumption = parseInt(this.stats['Consumption']) || 0;
+        if (this.stats['Active'] == "true")
+            consumption *= 4;
         this.kingdom.modify("Consumption", consumption, "Armies");
     },
 
@@ -5673,27 +5673,27 @@ $.kingdom.ArmyTable = Class.create({
 
     addCheckboxCell: function (row, value, changeCallback) {
         var cell = $('<td></td>');
-	var checkbox = $('<input type="checkbox"/>');
-	cell.append(checkbox);
-	checkbox.prop('checked', value == "true");
-	checkbox.change(changeCallback);
+        var checkbox = $('<input type="checkbox"/>');
+        cell.append(checkbox);
+        checkbox.prop('checked', value == "true");
+        checkbox.change(changeCallback);
         row.append(cell);
         return cell;
     },
 
     addSelectCell: function (row, text, options, editCallback) {
         var cell = $('<td></td>');
-	var select = $('<select></select>');
-	$.each(options, function (index, value) {
-	    var option = $('<option></option>');
-	    option.text(value);
-	    if (value == text) {
-		option.prop('selected', true);
-	    }
-	    select.append(option);
-	});
-	select.change(editCallback);
-	cell.append(select);
+        var select = $('<select></select>');
+        $.each(options, function (index, value) {
+            var option = $('<option></option>');
+            option.text(value);
+            if (value == text) {
+                option.prop('selected', true);
+            }
+            select.append(option);
+        });
+        select.change(editCallback);
+        cell.append(select);
         row.append(cell);
         return cell;
     },
@@ -5713,13 +5713,13 @@ $.kingdom.ArmyTable = Class.create({
         var newRow = $('<tr></tr>');
         var nameCell = this.addCell(newRow, army.name, $.proxy(this.finishEditingName, this));
         $.each(army.statList, $.proxy(function (index, stat) {
-	    if (stat == 'Active') {
-		this.addCheckboxCell(newRow, army.getStat(stat), $.proxy(this.finishEditingActive, this));
-	    } else if (stat == 'Size') {
-		this.addSelectCell(newRow, army.getStat(stat), [ 'Fine', 'Diminutive', 'Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan', 'Colossal' ], $.proxy(this.finishEditingSize, this));
-	    } else {
-		this.addCell(newRow, army.getStat(stat), $.proxy(this.finishEditingStat, this, stat));
-	    }
+            if (stat == 'Active') {
+                this.addCheckboxCell(newRow, army.getStat(stat), $.proxy(this.finishEditingActive, this));
+            } else if (stat == 'Size') {
+                this.addSelectCell(newRow, army.getStat(stat), [ 'Fine', 'Diminutive', 'Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan', 'Colossal' ], $.proxy(this.finishEditingSize, this));
+            } else {
+                this.addCell(newRow, army.getStat(stat), $.proxy(this.finishEditingStat, this, stat));
+            }
         }, this));
         this.armiesTable.append(newRow);
         this.kingdom.setChoice(this.armyCountId, this.armies.length);
@@ -5756,13 +5756,13 @@ $.kingdom.ArmyTable = Class.create({
     },
 
     finishEditingSize: function (evt) {
-	var element = $(evt.target);
+        var element = $(evt.target);
         var index = element.parent().parent().index();
         this.armies[index].setStat('Size', element.val());
     },
 
     finishEditingActive: function (evt) {
-	var checkbox = $(evt.target);
+        var checkbox = $(evt.target);
         var index = checkbox.parent().parent().index();
         this.armies[index].setStat('Active', checkbox.prop('checked') ? "true" : "false");
     },
