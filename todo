@@ -1,4 +1,10 @@
 
+* option to demolish city wall
+
+* waterway treat as water border
+
+* Rename/modify list of ruler roles based on ruleset
+
 * thrown melee weapons which can have both types of enhancements
 
 Generalise not adjacent to to take a list of buildings
@@ -14,10 +20,6 @@ Need to handle lots containing multiple buildings
 Need to handle "parameterised" lots, that can contain (e.g.) a skill getting a lore bonus or a temple's alignment/variable kingdom bonusses.  Might as well allow custom rotation of building image as well.
 
 Prompt for parameter on constructing buildings that need them
-
-Building option: "Ruin building" (provides none of its benefits, but can be repaired for half price)
-
-Checkboxs on build menu: "Free Building" and "Free Ruin"
 
 Houses etc. can only fulfill one adjacency demand each
 
@@ -37,22 +39,31 @@ Alert when loading unknown buildings/leadership roles, prompting for substitutio
 
 Adjacency across streets while keeping existing coordinate system
 
-00 01  04 05  08 09  12 13
-02 03  06 07  10 11  14 15
+00 01  04 05  08 09
+02 03  06 07  10 11
 
-16 17  20 21
-18 19  22 23
+12 13  16 17  20 21
+14 15  18 19  22 23
 
-across street north: -14
-across street south: +14
+
+across street north: -10
+across street south: +10
 
 across street east: +3
 across street west: -3
 
-nw: -17
-ne: -11
-sw: +11
-se: +17
+nw: -13
+ne: -7
+sw: +7
+se: +13
+
+function matchBuilding(index, buildingList, actuallyCheck) {
+    if (actuallyCheck) {
+        if (building at index in buildingList)
+            return 1;
+    }
+    return 0;
+}
 
 function countAdjacent(index, buildings) {
     var square = parseInt(index / 4);
@@ -63,18 +74,18 @@ function countAdjacent(index, buildings) {
     var baseIndex = index & ~3;
     var position = (index & 3);
 
-    var count = countBuilding(baseIndex, buildings, baseIndex != index);
-    count += countBuilding(baseIndex + 1, buildings, baseIndex + 1 != index);
-    count += countBuilding(baseIndex + 2, buildings, baseIndex + 2 != index);
-    count += countBuilding(baseIndex + 3, buildings, baseIndex + 3 != index);
-    count += countBuilding(index - 14, buildings, position < 2 && !isTop);
-    count += countBuilding(index + 14, buildings, position > 1 && !isBottom);
-    count += countBuilding(index - 3, buildings, (position&1) == 0 && !isLeft);
-    count += countBuilding(index + 3, buildings, (position&1) == 1 && !isRight);
-    count += countBuilding(index - 17, buildings, position == 0 && !isLeft && !isTop);
-    count += countBuilding(index - 11, buildings, position == 1 && !isRight && !isTop);
-    count += countBuilding(index + 11, buildings, position == 2 && !isLeft && !isBottom);
-    count += countBuilding(index + 17, buildings, position == 3 && !isRight && !isBottom);
+    var count = matchBuilding(baseIndex, buildings, baseIndex != index);
+    count += matchBuilding(baseIndex + 1, buildings, baseIndex + 1 != index);
+    count += matchBuilding(baseIndex + 2, buildings, baseIndex + 2 != index);
+    count += matchBuilding(baseIndex + 3, buildings, baseIndex + 3 != index);
+    count += matchBuilding(index - 10, buildings, position < 2 && !isTop);
+    count += matchBuilding(index + 10, buildings, position > 1 && !isBottom);
+    count += matchBuilding(index - 3, buildings, (position&1) == 0 && !isLeft);
+    count += matchBuilding(index + 3, buildings, (position&1) == 1 && !isRight);
+    count += matchBuilding(index - 13, buildings, position == 0 && !isLeft && !isTop);
+    count += matchBuilding(index - 7, buildings, position == 1 && !isRight && !isTop);
+    count += matchBuilding(index + 7, buildings, position == 2 && !isLeft && !isBottom);
+    count += matchBuilding(index + 13, buildings, position == 3 && !isRight && !isBottom);
 
     return count;
 }

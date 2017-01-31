@@ -123,7 +123,7 @@ $.fn.editElement = function (callback, inputCallback) {
         {
             var parent = input.parent();
             var next = (evt.shiftKey) ? parent.prev() : parent.next();
-            if (next && $.data(next.get(0), 'events').click) {
+            if (next && $.data(next.get(0), 'events') && $.data(next.get(0), 'events').click) {
                 next.trigger("click");
                 evt.preventDefault();
             }
@@ -301,8 +301,9 @@ $.kingdom.KingdomManager = Class.create({
         $('#hrRuleset').val(this.current.getChoice('ruleset'));
         this.updateRulesDivs();
         $('#hrMansionVilla').prop('checked', this.current.getBooleanChoice('hrMansionVilla'));
+        $('#hrUnlimitedItems').prop('checked', this.current.getBooleanChoice('hrUnlimitedItems'));
         $('#hrCalculatePrice').prop('checked', this.current.getBooleanChoice('hrCalculatePrice'));
-        $('#hrCalculateEconomyBoost').prop('checked', this.current.getBooleanChoice('hrCalculateEconomyBoost'));
+        $('#hrSlotsBoostEconomy').prop('checked', this.current.getBooleanChoice('hrSlotsBoostEconomy'));
     },
 
     updateRulesDivs: function () {
@@ -318,9 +319,10 @@ $.kingdom.KingdomManager = Class.create({
     houseRulesChanged: function () {
         this.current.setChoice('ruleset', $('#hrRuleset').val());
         this.current.setChoice('hrMansionVilla', $('#hrMansionVilla').is(':checked'));
+        this.current.setChoice('hrUnlimitedItems', $('#hrUnlimitedItems').is(':checked'));
         this.current.setChoice('hrCalculatePrice', $('#hrCalculatePrice').is(':checked'));
-        this.current.setChoice('hrCalculateEconomyBoost', $('#hrCalculateEconomyBoost').is(':checked'));
-        this.current.houseRulesBuildings();
+        this.current.setChoice('hrSlotsBoostEconomy', $('#hrSlotsBoostEconomy').is(':checked'));
+        this.current.applyHouseRules();
     },
 
     closeHouseRules: function () {
@@ -453,7 +455,12 @@ $.kingdom.Kingdom = Class.create({
             $(input).change($.proxy(this.inputChanged, this));
         }, this));
         this.setupSelect('roads', 'size');
-        this.setupSelect('farms', 'roads');
+        if (this.getChoice('ruleset') == 'UC') {
+            this.setupSelect('highways', 'roads');
+            this.setupSelect('farms', 'size');
+        } else {
+            this.setupSelect('farms', 'roads');
+        }
         // SelectAffect instances
         this.alignment = new $.kingdom.SelectAffect(this, 'Alignment', null, {
             'Lawful Good': {
@@ -559,7 +566,7 @@ $.kingdom.Kingdom = Class.create({
         this.resourceTable = new $.kingdom.ResourceTable(this);
         this.armyTable = new $.kingdom.ArmyTable(this);
         // load appropriate rules
-        this.houseRulesBuildings();
+        this.applyHouseRules();
         // load cities
         this.magicItemSource = new $.kingdom.MagicItemSource();
         var cityNames = this.getArrayChoice('cityNames');
@@ -583,10 +590,21 @@ $.kingdom.Kingdom = Class.create({
                     this.spendTreasury(-1);
                 }
             } else if (check.delta <= -5) {
+                if (this.getChoice('ruleset') == 'UC') {
+                    var amount = parseInt(Math.random()*4) + 1;
+                    $('#turnStabilityOutput').append($('<div/>').text('Failed Stability check by 5 or more, ' + check.text + '  Increasing unrest by 1d4 = ' + amount + '!').addClass('problem'));
+                    this.setChoice('unrest', unrest + amount);
+                } else {
                     $('#turnStabilityOutput').append($('<div/>').text('Failed Stability check by 5 or more, ' + check.text + '  Increasing unrest by 2!').addClass('problem'));
                     this.setChoice('unrest', unrest + 2);
+                }
             } else {
+                if (this.getChoice('ruleset') == 'UC') {
+                    $('#turnStabilityOutput').append($('<div/>').text('Failed Stability check, ' + check.text + '  Increasing unrest by 1!').addClass('problem'));
+                    this.setChoice('unrest', unrest + 1);
+                } else {
                     $('#turnStabilityOutput').append($('<div/>').text('Failed Stability check, ' + check.text).addClass('problem'));
+                }
             }
         }, this));
         $('#payConsumptionButton').click($.proxy(function () {
@@ -606,6 +624,9 @@ $.kingdom.Kingdom = Class.create({
         $('#fillItemSlots').click($.proxy(function () {
             this.fillMagicItemSlots();
         }, this));
+        $('#modifyUnrestButton').click($.proxy(function () {
+            this.modifyUnrestAction();
+        }, this));
         $('#claimHexButton').click($.proxy(function () {
             var newSize = parseInt(this.getChoice('size')) + 1;
             this.setChoice('size', newSize);
@@ -615,25 +636,55 @@ $.kingdom.Kingdom = Class.create({
         $('.buildRoadButton').click($.proxy(function (evt) {
             var cost = parseInt($(evt.target).attr('name'));
             var size = parseInt(this.getChoice('size'));
-            var newRoads = parseInt(this.getChoice('roads')) + 1;
+            var newRoads = parseInt(this.getChoice('roads', 0)) + 1;
             if (newRoads <= size) {
                 this.setChoice('roads', newRoads);
                 this.spendTreasury(cost);
                 $('#improveHexOutput').append($('<div/>').text('Spent ' + cost + ' BPs to build new road, new total is ' + newRoads));
             } else {
-                $('#improveHexOutput').append($('<div/>').text('Cannot have more roads than hexes!').addClass('problem'));
+                $('#improveHexOutput').append($('<div/>').text('Cannot have more roads than claimed hexes!').addClass('problem'));
+            }
+        }, this));
+        $('.buildHighwayButton').click($.proxy(function (evt) {
+            var cost = parseInt($(evt.target).attr('name'));
+            var roads = parseInt(this.getChoice('roads'));
+            var newHighways = parseInt(this.getChoice('highways', 0)) + 1;
+            if (newHighways <= roads) {
+                this.setChoice('highways', newHighways);
+                this.spendTreasury(cost);
+                $('#improveHexOutput').append($('<div/>').text('Spent ' + cost + ' BPs to upgrade road to higway, new total is ' + newHighways));
+            } else {
+                $('#improveHexOutput').append($('<div/>').text('Cannot have more highways than roads!').addClass('problem'));
             }
         }, this));
         $('.buildFarmButton').click($.proxy(function (evt) {
             var cost = parseInt($(evt.target).attr('name'));
-            var roads = parseInt(this.getChoice('roads'));
-            var newFarms = parseInt(this.getChoice('farms')) + 1;
-            if (newFarms <= roads) {
+            var newFarms = parseInt(this.getChoice('farms', 0)) + 1;
+            var farmsLimit = (this.getChoice('ruleset') == 'UC') ? parseInt(this.getChoice('size')) : parseInt(this.getChoice('roads', 0));
+            if (newFarms <= farmsLimit) {
                 this.setChoice('farms', newFarms);
                 this.spendTreasury(cost);
                 $('#improveHexOutput').append($('<div/>').text('Spent ' + cost + ' BPs to build new farm, new total is ' + newFarms));
+            } else if (this.getChoice('ruleset') == 'UC') {
+                $('#improveHexOutput').append($('<div/>').text('Cannot have more farms than claimed hexes!').addClass('problem'));
             } else {
                 $('#improveHexOutput').append($('<div/>').text('Cannot have more farms than roads!').addClass('problem'));
+            }
+        }, this));
+        $('.buildTerrainImprovement').click($.proxy(function (evt) {
+            var target = $(evt.target);
+            var data = target.data('json');
+            var cost = data.cost;
+            this.spendTreasury(cost);
+            var name = target.val().replace(/ \([0-9]+ BP\)/, '');
+            $('#improveHexOutput').append($('<div/>').text('Built: ' + name + ', remaining BPs: ' + this.getTreasury()));
+            if (data.Unrest) {
+                var unrest = Math.max(0, parseInt(this.getChoice('unrest')) + data.Unrest);
+                this.setChoice('unrest', unrest);
+            }
+            if (data.Economy || data.Loyalty || data.Stability || data.IncomeBP || data.Consumption) {
+                // Create new resource
+                this.resourceTable.createResource(name, data);
             }
         }, this));
         $('#improveCitiesButton').click($.proxy(function () {
@@ -669,9 +720,14 @@ $.kingdom.Kingdom = Class.create({
             var dc = parseInt(this.get('ControlDC'));
             var check = parseInt(this.get('Economy')).roll(dc);
             if (check.pass) {
-                var amount = Math.floor((dc + check.delta)/5);
+                var economyDenominator = (this.getChoice('ruleset') == 'UC') ? 3 : 5;
+                var amount = Math.floor((dc + check.delta)/economyDenominator);
                 $('#generateIncomeOutput').append($('<div/>').text('Economy check passed, ' + check.text + '  Generated ' + amount + ' BPs.'));
-                this.spendTreasury(-amount);
+                var incomeBP = parseInt(this.get('IncomeBP')) || 0;
+                if (incomeBP != 0) {
+                    $('#generateIncomeOutput').append($('<div/>').text('Also generated ' + incomeBP + ' BPs from special resources.'));
+                }
+                this.spendTreasury(-amount - incomeBP);
             } else {
                 $('#generateIncomeOutput').append($('<div/>').text('Economy check failed, ' + check.text).addClass('problem'));
             }
@@ -839,7 +895,7 @@ $.kingdom.Kingdom = Class.create({
     },
 
     getTreasury: function () {
-        return parseInt(this.getChoice("treasury", 0));
+        return parseInt(this.getChoice("treasury")) || 0;
     },
 
     spendTreasury: function (amount) {
@@ -897,10 +953,22 @@ $.kingdom.Kingdom = Class.create({
         this.modify("Economy", parseInt(roads / 4), "Roads");
         this.modify("Stability", parseInt(roads / 8), "Roads");
 
-        $('[name="farms"]').setSelect(roads);
-        if (farms > roads) {
-            this.setChoice("farms", roads);
-            farms = roads;
+        if (this.getChoice('ruleset') == 'UC') {
+            $('[name="highways"]').setSelect(roads);
+            var highways = parseInt(this.getChoice("highways", 0));
+            if (highways > roads) {
+                this.setChoice("highways", roads);
+                highways = roads;
+            }
+            this.modify("Economy", parseInt(highways / 4), "Highways");
+            this.modify("Stability", parseInt(highways / 8), "Highways");
+        }
+
+        var farmsLimit = (this.getChoice('ruleset') == 'UC') ? size : roads;
+        $('[name="farms"]').setSelect(farmsLimit);
+        if (farms > farmsLimit) {
+            this.setChoice("farms", farmsLimit);
+            farms = farmsLimit;
         }
         var farms = parseInt(this.getChoice("farms", 0));
         var farmsProduction = 2 * farms;
@@ -916,7 +984,7 @@ $.kingdom.Kingdom = Class.create({
             this.set('limitBuildingsCurrent', 'no limit');
         } else {
             var remaining = parseInt(this.get('limitBuildings')) - parseInt(this.getChoice('buildsThisTurn'));
-            this.set('limitBuildingsCurrent', remaining + ' building' + (remaining > 1 ? 's' : ''));
+            this.set('limitBuildingsCurrent', remaining + ' building' + (remaining != 1 ? 's' : ''));
         }
         this.setExtraHouse();
 
@@ -946,14 +1014,14 @@ $.kingdom.Kingdom = Class.create({
         this.taxation.apply();
         this.festivals.apply();
 
-            // armies
+        // armies
         this.armyTable.apply();
-
-        // global factors
-        this.apply();
 
         // other resources
         this.resourceTable.apply();
+
+        // global factors
+        this.apply();
 
         this.leaderTable.apply();
     },
@@ -1024,6 +1092,39 @@ $.kingdom.Kingdom = Class.create({
     pushItemTypeTotal: function (list, number, type) {
         if (number) {
             list.push(number + ' ' + type + ' item' + (number > 1 ? 's' : ''));
+        }
+    },
+
+    unrestFromNegatives: function (attr) {
+        if (this.get(attr) < 0) {
+            var unrest = parseInt(this.getChoice('unrest', 0)) + 1;
+            $('#modifyUnrestOutput').append($('<div/>').text(attr + ' is negative - increasing Unrest to ' + unrest + '!'));
+            this.setChoice('unrest', unrest);
+            return true;
+        }
+        return false;
+    },
+
+    modifyUnrestAction: function () {
+        var change = this.unrestFromNegatives('Economy');
+        change = this.unrestFromNegatives('Loyalty') || change;
+        change = this.unrestFromNegatives('Stability') || change;
+        if (this.get('UnrestRate')) {
+            var delta = this.get('UnrestRate');
+            var unrest = parseInt(this.getChoice('unrest', 0));
+            if (unrest > 0 || delta > 0) {
+                change = true;
+                unrest = Math.max(0, unrest + delta);
+                if (delta > 0) {
+                    $('#modifyUnrestOutput').append($('<div/>').text('Increasing Unrest by ' + delta + ' to ' + unrest));
+                } else {
+                    $('#modifyUnrestOutput').append($('<div/>').text('Decreasing Unrest by ' + -delta + ' to ' + unrest));
+                }
+                this.setChoice("unrest", unrest);
+            }
+        }
+        if (!change) {
+            $('#modifyUnrestOutput').append($('<div/>').text('Unrest unchanged.'));
         }
     },
 
@@ -1155,1011 +1256,32 @@ $.kingdom.Kingdom = Class.create({
         return this.goalBuildings[goal];
     },
 
-    setRiversRunRedData: function () {
-        $.kingdom.Building.buildingData = {
-            'continue': {},
-            'Academy': {
-                'size': '2x1',
-                'cost': 52,
-                'halveCost': ["Caster's Tower", "Library", "Magic Shop"],
-                'minorItems': 3,
-                'mediumItems': 2,
-                'Economy': 2,
-                'Loyalty': 2
-            },
-            'Alchemist': {
-                'size': '1x1',
-                'cost': 18,
-                'adjacentHouses': 1,
-                'cityValue': 1000,
-                'minorItems': 1,
-                'Economy': 1
-            },
-            'Arena': {
-                'size': '2x2',
-                'cost': 40,
-                'halveCost': ["Garrison", "Theater"],
-                'halveKingdom': 'Festivals',
-                'Stability': 4,
-                'onePerCity': true
-            },
-            'Barracks': {
-                'size': '1x1',
-                'cost': 6,
-                'Defense': 2,
-                'Unrest': -1
-            },
-            'Black Market': {
-                'size': '1x1',
-                'cost': 50,
-                'adjacentHouses': 2,
-                'cityValue': 2000,
-                'minorItems': 2,
-                'mediumItems': 1,
-                'majorItems': 1,
-                'Economy': 2,
-                'Stability': 2,
-                'Unrest': 1
-            },
-            'Brewery': {
-                'size': '1x1',
-                'cost': 6,
-                'Loyalty': 1,
-                'Stability': 1
-            },
-            'Brothel': {
-                'size': '1x1',
-                'cost': 4,
-                'adjacentHouses': 1,
-                'Economy': 1,
-                'Loyalty': 2,
-                'Unrest': 1
-            },
-            "Caster's Tower": {
-                'size': '1x1',
-                'cost': 30,
-                'minorItems': 3,
-                'mediumItems': 2,
-                'Economy': 1,
-                'Loyalty': 1
-            },
-            'Castle': {
-                'size': '2x2',
-                'cost': 54,
-                'halveCost': ["Noble Villa", "Town Hall"],
-                'Economy': 2,
-                'Loyalty': 2,
-                'Stability': 2,
-                'Defense': 8,
-                'Unrest': -4,
-                'onePerCity': true
-            },
-            'Cathedral': {
-                'size': '2x2',
-                'cost': 58,
-                'halveCost': ["Temple", "Academy"],
-                'halveKingdom': 'Promotions',
-                'minorItems': 3,
-                'mediumItems': 2,
-                'Loyalty': 4,
-                'Unrest': -4,
-                'onePerCity': true
-            },
-            'City Wall': {
-                'size': 'border',
-                'borderColour': '#666666',
-                'borderZ': 3,
-                'cost': 8,
-                'Defense': 4,
-                'Unrest': -2
-            },
-            'Dump': {
-                'size': '1x1',
-                'cost': 4,
-                'Stability': 1
-            },
-            'Exotic Craftsman': {
-                'size': '1x1',
-                'cost': 10,
-                'adjacentHouses': 1,
-                'minorItems': 1,
-                'Economy': 1,
-                'Stability': 1
-            },
-            'Garrison': {
-                'size': '2x1',
-                'cost': 28,
-                'halveCost': ["City Wall", "Granary", "Jail"],
-                'Loyalty': 2,
-                'Stability': 2,
-                'Unrest': -2,
-            },
-            'Granary': {
-                'size': '1x1',
-                'cost': 12,
-                'Loyalty': 1,
-                'Stability': 1
-            },
-            'Graveyard': {
-                'size': '1x1',
-                'cost': 4,
-                'Loyalty': 1
-            },
-            'Guildhall': {
-                'size': '2x1',
-                'cost': 34,
-                'adjacentHouses': 1,
-                'cityValue': 1000,
-                'halveCost': ["Pier", "Stable", "Tradesman"],
-                'Economy': 2,
-                'Loyalty': 2
-            },
-            'Herbalist': {
-                'size': '1x1',
-                'cost': 10,
-                'adjacentHouses': 1,
-                'minorItems': 1,
-                'Loyalty': 1,
-                'Stability': 1
-            },
-            'House': {
-                'size': '1x1',
-                'cost': 3,
-                'extraBuild': 1,
-                'isHouse': true,
-                'Unrest': -1
-            },
-            'Inn': {
-                'size': '1x1',
-                'cost': 10,
-                'adjacentHouses': 1,
-                'cityValue': 500,
-                'Economy': 1,
-                'Loyalty': 1
-            },
-            'Jail': {
-                'size': '1x1',
-                'cost': 14,
-                'Loyalty': 2,
-                'Stability': 2,
-                'Unrest': -2
-            },
-            'Land': {
-                'size': 'border',
-                'borderColour': 'tan',
-                'borderZ': 1,
-                'onlyEmpty': true,
-                'cost': 0
-            },
-            'Library': {
-                'size': '1x1',
-                'cost': 6,
-                'Economy': 1,
-                'Loyalty': 1
-            },
-            'Luxury Store': {
-                'size': '1x1',
-                'cost': 28,
-                'adjacentHouses': 1,
-                'cityValue': 2000,
-                'minorItems': 2,
-                'Economy': 1
-            },
-            'Magic Shop': {
-                'size': '1x1',
-                'cost': 68,
-                'adjacentHouses': 2,
-                'cityValue': 2000,
-                'minorItems': 4,
-                'mediumItems': 2,
-                'majorItems': 1,
-                'Economy': 1
-            },
-            'Mansion': {
-                'size': '1x1',
-                'cost': 10,
-                'Stability': 1
-            },
-            'Market': {
-                'size': '2x1',
-                'cost': 48,
-                'adjacentHouses': 2,
-                'cityValue': 2000,
-                'halveCost': ["Black Market", "Inn", "Shop"],
-                'minorItems': 2,
-                'Economy': 2,
-                'Stability': 2
-            },
-            'Mill': {
-                'size': '1x1',
-                'cost': 6,
-                'adjacentWater': true,
-                'Economy': 1,
-                'Stability': 1
-            },
-            'Monument': {
-                'size': '1x1',
-                'cost': 6,
-                'Loyalty': 3,
-                'Unrest': -1
-            },
-            'Noble Villa': {
-                'size': '2x1',
-                'cost': 24,
-                'halveCost': ["Exotic Craftsman", "Luxury Store", "Mansion"],
-                'Economy': 1,
-                'Loyalty': 1,
-                'Stability': 1
-            },
-            'Park': {
-                'size': '1x1',
-                'cost': 4,
-                'Loyalty': 1,
-                'Unrest': -1
-            },
-            'Pier': {
-                'size': '1x1',
-                'cost': 16,
-                'adjacentWater': true,
-                'cityValue': 1000,
-                'Economy': 1,
-                'Stability': 1
-            },
-            'Shop': {
-                'size': '1x1',
-                'cost': 8,
-                'adjacentHouses': 1,
-                'cityValue': 500,
-                'Economy': 1
-            },
-            'Shrine': {
-                'size': '1x1',
-                'cost': 8,
-                'minorItems': 1,
-                'Loyalty': 1,
-                'Unrest': -1
-            },
-            'Smith': {
-                'size': '1x1',
-                'cost': 6,
-                'Economy': 1,
-                'Stability': 1
-            },
-            'Stable': {
-                'size': '1x1',
-                'cost': 10,
-                'adjacentHouses': 1,
-                'cityValue': 500,
-                'Economy': 1,
-                'Loyalty': 1
-            },
-            'Tannery': {
-                'size': '1x1',
-                'cost': 6,
-                'noAdjacentHouses': true,
-                'Economy': 1,
-                'Stability': 1
-            },
-            'Tavern': {
-                'size': '1x1',
-                'cost': 12,
-                'adjacentHouses': 1,
-                'cityValue': 500,
-                'Economy': 1,
-                'Loyalty': 1
-            },
-            'Temple': {
-                'size': '2x1',
-                'cost': 32,
-                'halveCost': ["Graveyard", "Monument", "Shrine"],
-                'minorItems': 2,
-                'Loyalty': 2,
-                'Stability': 2,
-                'Unrest': -2
-            },
-            'Tenement': {
-                'size': '1x1',
-                'cost': 1,
-                'Unrest': 2,
-                'isHouse': true,
-                'upgradeTo': "House"
-            },
-            'Theater': {
-                'size': '2x1',
-                'cost': 24,
-                'halveCost': ["Brothel", "Park", "Tavern"],
-                'Economy': 2,
-                'Stability': 2
-            },
-            'Town Hall': {
-                'size': '2x1',
-                'cost': 22,
-                'halveCost': ["Barracks", "Dump", "Watchtower"],
-                'Economy': 1,
-                'Loyalty': 1,
-                'Stability': 1
-            },
-            'Tradesman': {
-                'size': '1x1',
-                'cost': 10,
-                'adjacentHouses': 1,
-                'cityValue': 500,
-                'Economy': 1,
-                'Stability': 1
-            },
-            'Watchtower': {
-                'size': '1x1',
-                'cost': 12,
-                'Stability': 1,
-                'Defense': 2,
-                'Unrest': -1
-            },
-            'Water': {
-                'size': 'border',
-                'borderColour': '#7777ff',
-                'borderZ': 2,
-                'onlyEmpty': true,
-                'cost': 0
-            },
-            'Waterfront': {
-                'size': '2x2',
-                'cost': 90,
-                'adjacentWater': true,
-                'cityValue': 4000,
-                'minorItems': 3,
-                'mediumItems': 2,
-                'majorItems': 1,
-                'halveCost': ["Guildhall", "Market"],
-                'halveKingdom': 'Taxation',
-                'Economy': 4,
-                'onePerCity': true
-            }
-        };
-    },
-
-    setUltimateCampaignData: function () {
-        $.kingdom.Building.buildingData = {
-            'continue': {},
-            'Academy': {
-                'size': '2x1',
-                'cost': 52,
-                'halveCost': ["Caster's Tower", "Library", "Magic Shop"],
-                'upgradeTo': "University",
-                'minorItems': 3, // TODO: scrolls or wondrous items only
-                'mediumItems': 2, // TODO: scrolls or wondrous items only
-                'Economy': 2,
-                'Loyalty': 2,
-                'lore': {'default': 2, 'Nominated Knowledge or Profession skill': 2 }, // TODO: Nominate 1 knowledge or profession skill that gets another +2
-                'productivity': 1,
-                'society': 2
-            },
-            'Alchemist': {
-                'size': '1x1',
-                'cost': 18,
-                'adjacentHouses': 1,
-                'cityValue': 1000,
-                'minorItems': 1, // TODO: potion or wondrous item only
-                'Economy': 1
-            },
-            'Arena': {
-                'size': '2x2',
-                'cost': 40,
-                'halveCost': ["Dance Hall", "Garrison", "Inn", "Stable", "Theater"],
-                'halveKingdom': 'Festivals',
-                'Stability': 4,
-                'onePerCity': true,
-                'Fame': 1, // TODO
-                'crime': 1
-            },
-            'Bank': {
-                'size': '1x1', // TODO image required
-                'cost': 28,
-                'Economy': 4,
-                'cityValue': 2000
-            },
-            'Bardic College': {
-                'size': '2x1', // TODO image required
-                'cost': 40,
-                'halveCost': ["Library", "Museum", "Theater"],
-                'minorItems': 2, // TODO: scrolls or wondrous items only
-                'Economy': 1,
-                'Loyalty': 3,
-                'Stability': 1,
-                'Fame': 1 // TODO
-            },
-            'Barracks': {
-                'size': '1x1',
-                'cost': 6,
-                'upgradeTo': 'Garrison',
-                'Defense': 2,
-                'Unrest': -1,
-                'law': 1
-            },
-            'Black Market': {
-                'size': '1x1',
-                'cost': 50,
-                'halveCost': ["Dance Hall"],
-                'adjacentHouses': 2,
-                'cityValue': 2000,
-                'minorItems': 2,
-                'mediumItems': 1,
-                'majorItems': 1,
-                'Economy': 2,
-                'Stability': 1,
-                'Unrest': 1,
-                'corruption': 2,
-                'crime': 2
-            },
-            'Brewery': {
-                'size': '1x1',
-                'cost': 6,
-                'Loyalty': 1,
-                'Stability': 1
-            },
-            'Bridge': {
-                'size': '1x1', // TODO image required
-                'cost': 6,
-                'Economy': 1
-                // TODO replaces/shares with Waterway
-            },
-            'Bureau': {
-                'size': '2x1', // TODO image required
-                'cost': 10,
-                'Economy': 1,
-                'Loyalty': -1,
-                'Stability': 1,
-                'corruption': 1,
-                'law': 1
-            },
-            "Caster's Tower": {
-                'size': '1x1',
-                'cost': 30,
-                'minorItems': 3,
-                'mediumItems': 2,
-                'Economy': 1,
-                'Loyalty': 1
-            },
-            'Castle': {
-                'size': '2x2',
-                'cost': 54,
-                'halveCost': ["Noble Villa", "Town Hall"],
-                'Economy': 2,
-                'Loyalty': 2,
-                'Stability': 2,
-                'Defense': 8,
-                'Unrest': -4,
-                'onePerCity': true,
-                'Fame': 1 // TODO
-            },
-            'Cathedral': {
-                'size': '2x2',
-                'cost': 58,
-                'halveCost': ["Temple", "Academy"],
-                'halveKingdom': 'Promotions',
-                'minorItems': 3, // TODO potions or wondrous items
-                'mediumItems': 2, // TODO potions or wondrous items
-                'Loyalty': 4,
-                'Stability': 4,
-                'Unrest': -4,
-                'onePerCity': true,
-                'Fame': 1, // TODO
-                'law': 2
-            },
-            'Cistern': {
-                'size': '1x1', // TODO image required
-                'cost': 6,
-                'Stability': 1
-                // TODO may not be adjacent to a Dump, Graveyard, Stable, Stockyard or Tannery
-                // TODO can share a lot with another building :(
-            },
-            'City Wall': {
-                'size': 'border',
-                'borderColour': '#666666',
-                'borderZ': 3,
-                'cost': 2,
-                'Defense': 1,
-                'Unrest': -2 // TODO once per settlement only
-            },
-            'Dance Hall': {
-                'size': '1x1',
-                'image': 'Brothel',
-                'cost': 4,
-                'adjacentHouses': 1,
-                'Economy': 1,
-                'Loyalty': 2,
-                'Unrest': 1,
-                'corruption': 1,
-                'crime': 1
-            },
-            'Dump': {
-                'size': '1x1',
-                'cost': 4,
-                'Stability': 1
-                // TODO may not be adjacent to a House, Mansion or Noble Villa
-            },
-            'Everflowing Spring': {
-                'cost': 5
-                // TODO requires at least 1 medium magic item slot
-                // TODO shares a lot with Castle, Cathedral, Market, Monument, Park or Town Hall
-            },
-            'Exotic Artisan': {
-                'size': '1x1',
-                'image': 'Exotic Craftsman',
-                'cost': 10,
-                'adjacentHouses': 1,
-                'minorItems': 1, // TODO ring, wand or wondrous item
-                'Economy': 1,
-                'Stability': 1
-            },
-            'Foreign Quarter': {
-                'size': '2x2', // TODO image required
-                'cost': 30,
-                'Economy': 3,
-                'Stability': -1,
-                'crime': 1,
-                'lore': {'default': 1},
-                'society': 2
-                // TODO increases value of trade routes by 5% to a maximum of 100%
-            },
-            'Foundry': {
-                'size': '2x1', // TODO image required
-                'cost': 16,
-                'Economy': 1,
-                'Stability': 1,
-                'Unrest': 1,
-                'halveCost': ["Blacksmith"],
-                'adjacentWater': true,
-                'productivity': 1
-                // TODO increase the Economy and BP-per-turn from a connected mine :(
-            },
-            'Garrison': {
-                'size': '2x1',
-                'cost': 28,
-                'halveCost': ["City Wall", "Granary", "Jail"],
-                'Loyalty': 2,
-                'Stability': 2,
-                'Unrest': -2,
-            },
-            'Granary': {
-                'size': '1x1',
-                'cost': 12,
-                'Loyalty': 1,
-                'Stability': 1
-                // TODO if Consumption is < 0, store up to 5 BP to use to pay later Consumption
-            },
-            'Graveyard': {
-                'size': '1x1',
-                'cost': 4,
-                'Loyalty': 1
-            },
-            'Guildhall': {
-                'size': '2x1',
-                'cost': 34,
-                'adjacentHouses': 1,
-                'cityValue': 1000,
-                'halveCost': ["Pier", "Stable", "Trade Shop"],
-                'Economy': 2,
-                'Loyalty': 2,
-                'law': 1,
-                'productivity': 2
-            },
-            'Herbalist': {
-                'size': '1x1',
-                'cost': 10,
-                'adjacentHouses': 1,
-                'minorItems': 1, // TODO potion or wondrous item
-                'Loyalty': 1,
-                'Stability': 1
-            },
-            'Hospital': {
-                'size': '2x1', // TODO image required
-                'cost': 30,
-                'Loyalty': 1,
-                'Stability': 2,
-                'lore': {'default': 1},
-                'productivity': 2
-                // TODO Increase Stability by 2 during plague events
-            },
-            'House': {
-                'size': '1x1',
-                'cost': 3,
-                'extraBuild': 1,
-                'isHouse': true,
-                'Unrest': -1
-            },
-            'Inn': {
-                'size': '1x1',
-                'cost': 10,
-                'adjacentHouses': 1,
-                'cityValue': 500,
-                'Economy': 1,
-                'Loyalty': 1,
-                'society': 1
-            },
-            'Jail': {
-                'size': '1x1',
-                'cost': 14,
-                'Loyalty': 2,
-                'Stability': 2,
-                'Unrest': -2,
-                'crime': -1,
-                'law': 1
-            },
-            'Land': {
-                'size': 'border',
-                'borderColour': '#97974F',
-                'borderZ': 1,
-                'onlyEmpty': true,
-                'cost': 0
-            },
-            'Library': {
-                'size': '1x1',
-                'cost': 6,
-                'Economy': 1,
-                'Loyalty': 1,
-                'upgradeTo': 'Academy',
-                'lore': {'default': 1}
-            },
-            'Luxury Store': {
-                'size': '1x1',
-                'cost': 28,
-                'adjacentHouses': 1,
-                'upgradeTo': 'Magic Shop',
-                'cityValue': 2000,
-                'minorItems': 2, // TODO rings, wands or wondrous items
-                'Economy': 1
-            },
-            'Magic Shop': {
-                'size': '1x1',
-                'cost': 68,
-                'adjacentHouses': 2,
-                'cityValue': 2000,
-                'minorItems': 4, // TODO wondrous items
-                'mediumItems': 2, // TODO wondrous items
-                'majorItems': 1, // TODO wondrous items
-                'Economy': 1
-            },
-            'Magical Academy': {
-                'size': '2x1', // TODO image required
-                'cost': 58,
-                'Economy': 2,
-                'Fame': 1, // TODO
-                'halveCost': ["Caster's Tower", "Library", "Magic Shop"],
-                'minorItems': 3, // TODO potions, scrolls or wondrous items
-                'mediumItems': 1, // TODO potions, scrolls or wondrous items
-                'lore': {'default': 2, 'Knowledge (Arcana)': 2},
-                'society': 1
-            },
-            'Magical Streetlamps': {
-                // TODO can share a lot with building or improvement
-                'cost': 5,
-                // TODO Settlement must have a Cathedral, Magic Shop, Magical Academy or Temple
-                'crime': -1
-            },
-            'Mansion': {
-                'size': '1x1',
-                'cost': 10,
-                'Stability': 1,
-                'upgradeTo': 'Noble Villa',
-                'law': 1,
-                'society': 1
-            },
-            'Market': {
-                'size': '2x1',
-                'cost': 48,
-                'adjacentHouses': 2,
-                'cityValue': 2000,
-                'halveCost': ["Black Market", "Inn", "Shop"],
-                'minorItems': 2, // TODO wondrous items
-                'Economy': 2,
-                'Stability': 2
-            },
-            'Menagerie': {
-                'size': '2x2', // TODO image required
-                'cost': 16,
-                'Economy': 1,
-                'Loyalty': 0, // TODO 1/4 the CR of the highest CR creature on display
-                'Fame': 1
-            },
-            'Military Academy': {
-                'size': '2x1', // TODO image required
-                'cost': 36,
-                'Loyalty': 2,
-                'Stability': 2,
-                'Fame': 1, // TODO
-                'halveCost': ["Barracks"],
-                'onePerCity': true,
-                // TODO Armies and commanders recruited in city gain one bonus tactic
-                'minorItems': 1, // TODO armor, shield or weapon
-                'mediumItems': 1, // TODO armor, shield or weapon
-                'law': 1,
-                'lore': {'default': 1}
-            },
-            'Mill': {
-                'size': '1x1',
-                'cost': 6,
-                'adjacentWater': true,
-                'Economy': 1,
-                'Stability': 1,
-                'productivity': 1
-                // TODO Windmill with GM approval can ignore water border limit
-            },
-            'Mint': {
-                'size': '1x1', // TODO image required
-                'cost': 30,
-                'Economy': 3,
-                'Loyalty': 3,
-                'Stability': 1,
-                'Fame': 1 // TODO
-            },
-            'Moat': {
-                'size': 'border',
-                'borderColour': '#000', // TODO colour required
-                'borderZ': 3,
-                'cost': 2,
-                'Defense': 1,
-                'Unrest': -1 // TODO once per settlement only
-            },
-            'Monastery': {
-                'size': '2x1', // TODO image required
-                'cost': 16,
-                'Stability': 1,
-                'law': 1,
-                'lore': {'default': 1}
-            },
-            'Monument': {
-                'size': '1x1',
-                'cost': 6,
-                'Loyalty': 1,
-                'Unrest': -1
-            },
-            'Museum': {
-                'size': '2x1', // TODO image required
-                'cost': 30,
-                'Economy': 1,
-                'Loyalty': 1,
-                'Fame': 1, // TODO optional +1 per 10,000 gp of most valuable item (max +5), +1 more if significant to kingdom
-                'lore': {'default': 2, 'Knowledge (History)': 2, 'Appraise checks regarding art objects': 0},
-                'society': 1
-            },
-            'Noble Villa': {
-                'size': '2x1',
-                'cost': 24,
-                'halveCost': ["Exotic Artisan", "Luxury Store", "Mansion"],
-                'Economy': 1,
-                'Loyalty': 1,
-                'Stability': 1,
-                'Fame': 1, // TODO
-                'society': 1
-            },
-            'Observatory': {
-                'size': '1x1', // TODO image required
-                'cost': 12,
-                'Stability': 1,
-                'minorItems': 1, // TODO scroll or wondrous item
-                'lore': {'default': 2}
-            },
-            'Orphanage': {
-                'size': '1x1', // TODO image required
-                'cost': 6,
-                'Stability': 1,
-                'Unrest': -1
-            },
-            'Palace': {
-                'size': '2x2', // TODO image required
-                'cost': 108,
-                'Economy': 2,
-                'Loyalty': 6,
-                'Stability': 2,
-                'Fame': 1, // TODO
-                'halveCost': ["Mansion", "Mint", "Noble Villa"],
-                'cityValue': 1000,
-                'law': 2
-                // TODO may make two special edicts per turn but take -2 on checks for each
-            },
-            'Park': {
-                'size': '1x1',
-                'cost': 4,
-                'Loyalty': 1,
-                'Unrest': -1
-            },
-            'Paved Streets': {
-                'size': 'district', // TODO per-district
-                'cost': 24,
-                'Economy': 2,
-                'Stability': 1,
-                'productivity': 2
-            },
-            'Pier': {
-                'size': '1x1',
-                'cost': 16,
-                'adjacentWater': true,
-                'cityValue': 1000,
-                'upgradeTo': 'Waterfront',
-                'Economy': 1,
-                'Stability': 1,
-                'crime': 1
-            },
-            'Sewer System': {
-                'size': 'district', // TODO per-district
-                'cost': 24,
-                'Loyalty': 1,
-                'Stability': 2,
-                'halveCost': ["Cistern", "Dump"],
-                'crime': 1,
-                'productivity': 1
-            },
-            'Shop': {
-                'size': '1x1',
-                'cost': 8,
-                'adjacentHouses': 1, // TODO also Mansion
-                'cityValue': 500,
-                'upgradeTo': ["Luxury Store", "Market"],
-                'Economy': 1,
-                'productivity': 1
-            },
-            'Shrine': {
-                'size': '1x1',
-                'cost': 8,
-                'minorItems': 1, // TODO potion, scroll, wondrous item
-                'upgradeTo': 'Temple',
-                'Loyalty': 1,
-                'Unrest': -1
-            },
-            'Smithy': {
-                'size': '1x1',
-                'image': 'Smith',
-                'cost': 6,
-                'Economy': 1,
-                'Stability': 1
-            },
-            'Stable': {
-                'size': '1x1',
-                'cost': 10,
-                'Economy': 1,
-                'Loyalty': 1,
-                'adjacentHouses': 1, // also Mansion or Noble Villa
-                'cityValue': 500
-            },
-            'Stockyard': {
-                'size': '2x2', // TODO image required
-                'cost': 20,
-                'Economy': 1,
-                'Stability': -1,
-                'halveCost': ["Stable", "Tannery"],
-                'productivity': 1
-                // TODO Farms in this or adjacent hexes reduce Consumption by 3 instead of 2
-            },
-            'Tannery': {
-                'size': '1x1',
-                'cost': 6,
-                'Economy': 1,
-                'Stability': 1,
-                'noAdjacentHouses': true, // includes Mansions and Noble Villas
-                'society': -1
-            },
-            'Tavern': {
-                'size': '1x1',
-                'cost': 12,
-                'Economy': 1,
-                'Loyalty': 1,
-                'adjacentHouses': 1,
-                'cityValue': 500,
-                'corruption': 1
-            },
-            'Temple': {
-                'size': '2x1',
-                'cost': 32,
-                'Loyalty': 2,
-                'Stability': 2,
-                'Unrest': -2,
-                'halveCost': ["Graveyard", "Monument", "Shrine"],
-                'minorItems': 2
-            },
-            'Tenement': {
-                'size': '1x1',
-                'cost': 1,
-                'Unrest': 2,
-                'isHouse': true,
-                'upgradeTo': "House"
-            },
-            'Theater': {
-                'size': '2x1',
-                'cost': 24,
-                'Economy': 2,
-                'Stability': 2,
-                'halveCost': ["Dance Hall", "Exotic Artisan", "Inn", "Park", "Tavern"],
-                'upgradeTo': "Arena"
-            },
-            'Town Hall': {
-                'size': '2x1',
-                'cost': 22,
-                'Economy': 1,
-                'Loyalty': 1,
-                'Stability': 1,
-                'halveCost': ["Barracks", "Cistern", "Dump", "Jail", "Watchtower"],
-                'law': 1
-            },
-            'Trade Shop': {
-                'size': '1x1',
-                'image': 'Tradesman',
-                'cost': 10,
-                'Economy': 1,
-                'Stability': 1,
-                'adjacentHouses': 1,
-                'upgradeTo': "Guildhall",
-                'cityValue': 500,
-                'productivity': 1
-            },
-            'University': {
-                'size': '2x2',
-                'cost': 78,
-                'Economy': 3,
-                'Loyalty': 3,
-                'Fame': 1, // TODO
-                'halveCost': ["Academy", "Bardic College", "Library", "Magical Academy", "Military Academy", "Museum"],
-                'minorItems': 4, // TODO scrolls or wondrous items
-                'mediumItems': 2, // TODO scrolls or wondrous items
-                'lore': {'default': 4, 'Nominated Knowledge or Profession skill': 4}, // TODO +4 more to a nomninated Knowledge or Profession skill
-                'society': 3
-            },
-            'Watchtower': {
-                'size': '1x1',
-                'cost': 12,
-                'Stability': 1,
-                'Defense': 2,
-                'Unrest': -1
-            },
-            'Watergate': {
-                // TODO shares city wall :(
-                'cost': 2,
-                'extraBuild': 1
-            },
-            'Water': {
-                'size': 'border',
-                'borderColour': '#7777ff',
-                'borderZ': 2,
-                'onlyEmpty': true,
-                'cost': 0
-            },
-            'Waterfront': {
-                'size': '2x2',
-                'cost': 90,
-                'Economy': 4,
-                'halveCost': ["Black Market", "Guildhall", "Market", "Pier"],
-                'adjacentWater': true,
-                'onePerCity': true,
-                'cityValue': 4000,
-                'halveKingdom': 'Taxation',
-                'minorItems': 2, // TODO wondrous items
-                'mediumItems': 1, // TODO wondrous items
-                'majorItems': 1, // TODO wondrous items
-                'productivity': 2
-            },
-            'Waterway': {
-                'size': '1x1', // TODO image required, can be 2x1 if you want :-P
-                'cost': 3
-                // TODO counts as a water border for adjacent houses
-            }
-        };
-    },
-
-    houseRulesBuildings: function () {
-        if (this.getChoice('ruleset') == 'UC')
-            this.setUltimateCampaignData();
-        else
-            this.setRiversRunRedData();
+    applyHouseRules: function () {
+        if (this.getChoice('ruleset') == 'UC') {
+            $.kingdom.Building.buildingData = $.extend(true, {}, $.kingdom.Building.prototype.ultimateCampaignBuildingData);
+            $('.rrrOnly').hide();
+            $('.ucOnly').show();
+        } else {
+            $.kingdom.Building.buildingData = $.extend(true, {}, $.kingdom.Building.prototype.riversRunRedBuildingData);
+            $('.rrrOnly').show();
+            $('.ucOnly').hide();
+        }
         if (this.getBooleanChoice('hrMansionVilla')) {
             console.info('Mansions and Noble Villas are houses');
             $.kingdom.Building.buildingData['Mansion'].isHouse = true;
             $.kingdom.Building.buildingData['Noble Villa'].isHouse = true;
         }
+        if (this.getBooleanChoice('hrSlotsBoostEconomy')) {
+            $('.laboriousItemSlots').hide();
+        } else {
+            $('.laboriousItemSlots').show();
+        }
         var calculate = this.getBooleanChoice('hrCalculatePrice')
-        var economyBoost = this.getBooleanChoice('hrCalculateEconomyBoost')
+        var economyBoost = this.getBooleanChoice('hrSlotsBoostEconomy')
         var above = 0;
         var below = 0;
         if (economyBoost)
-            console.info('Spell slots boost Economy (instead of selling)');
+            console.info('Spell slots boost Economy (instead of filling/selling)');
         $.each($.kingdom.Building.buildingData, function (name, data) {
             var z = function (value) {
                 return parseInt(value) || 0;
@@ -2199,7 +1321,7 @@ $.kingdom.Kingdom = Class.create({
             cost += 4 * data.halveCost.length;
         if (data.halveKingdom)
             cost += 8;
-        if (!this.getBooleanChoice('hrCalculateEconomyBoost')) {
+        if (!this.getBooleanChoice('hrSlotsBoostEconomy')) {
             if (data.majorItems)
                 cost += 3 * 15;
             else if (data.mediumItems)
@@ -2390,7 +1512,8 @@ $.kingdom.PeopleTable = Class.create({
             $(element).parent().remove();
         this.kingdom.setChoice(this.peopleListId, Object.keys(this.people).sort());
         // TODO handle if they had a job
-        if (oldValue) {}
+        if (oldValue) {
+        }
     },
 
     getPerson: function (name) {
@@ -2665,12 +1788,17 @@ $.kingdom.LimitsTable = Class.create({
         return this.limitFromArray([1, 1, 2, 2, 3, 4]);
     },
 
+    getBuildLimitTerrain: function () {
+        return this.limitFromArray([2, 3, 5, 7, 9, 12]);
+    },
+
     refresh: function () {
         this.kingdom.set("limitCities", this.getBuildLimitCities());
         this.kingdom.set("limitBuildings", this.getBuildLimitBuildings());
         this.kingdom.set("limitHexes", this.getBuildLimitHexes());
         this.kingdom.set("limitRoads", this.getBuildLimitRoads());
         this.kingdom.set("limitFarmlands", this.getBuildLimitFarmlands());
+        this.kingdom.set("limitTerrain", this.getBuildLimitTerrain());
     }
 
 });
@@ -2679,12 +1807,1009 @@ $.kingdom.LimitsTable = Class.create({
 
 $.kingdom.Building = Class.create({
 
+    ultimateCampaignBuildingData: {
+        'continue': {},
+        'Academy': {
+            'size': '2x1',
+            'cost': 52,
+            'halveCost': ["Caster's Tower", "Library", "Magic Shop"],
+            'upgradeTo': "University",
+            'minorItems': 3, // TODO: scrolls or wondrous items only
+            'mediumItems': 2, // TODO: scrolls or wondrous items only
+            'Economy': 2,
+            'Loyalty': 2,
+            'lore': {'default': 2, 'Nominated Knowledge or Profession skill': 2 }, // TODO: Nominate 1 knowledge or profession skill that gets another +2
+            'productivity': 1,
+            'society': 2
+        },
+        'Alchemist': {
+            'size': '1x1',
+            'cost': 18,
+            'adjacentHouses': 1,
+            'cityValue': 1000,
+            'minorItems': 1, // TODO: potion or wondrous item only
+            'Economy': 1
+        },
+        'Arena': {
+            'size': '2x2',
+            'cost': 40,
+            'halveCost': ["Dance Hall", "Garrison", "Inn", "Stable", "Theater"],
+            'halveKingdom': 'Festivals',
+            'Stability': 4,
+            'onePerCity': true,
+            'Fame': 1, // TODO
+            'crime': 1
+        },
+        'Bank': {
+            'size': '1x1',
+            'cost': 28,
+            'Economy': 4,
+            'cityValue': 2000
+        },
+        'Bardic College': {
+            'size': '2x1',
+            'cost': 40,
+            'halveCost': ["Library", "Museum", "Theater"],
+            'minorItems': 2, // TODO: scrolls or wondrous items only
+            'Economy': 1,
+            'Loyalty': 3,
+            'Stability': 1,
+            'Fame': 1 // TODO
+        },
+        'Barracks': {
+            'size': '1x1',
+            'cost': 6,
+            'upgradeTo': 'Garrison',
+            'Defense': 2,
+            'Unrest': -1,
+            'law': 1
+        },
+        'Black Market': {
+            'size': '1x1',
+            'cost': 50,
+            'halveCost': ["Dance Hall"],
+            'adjacentHouses': 2,
+            'cityValue': 2000,
+            'minorItems': 2,
+            'mediumItems': 1,
+            'majorItems': 1,
+            'Economy': 2,
+            'Stability': 1,
+            'Unrest': 1,
+            'corruption': 2,
+            'crime': 2
+        },
+        'Brewery': {
+            'size': '1x1',
+            'cost': 6,
+            'Loyalty': 1,
+            'Stability': 1
+        },
+        'Bridge': {
+            'size': '1x1',
+            'cost': 6,
+            'Economy': 1
+            // TODO replaces/shares with Waterway
+            // TODO there are several bridge images in UC
+        },
+        'Bureau': {
+            'size': '2x1',
+            'cost': 10,
+            'Economy': 1,
+            'Loyalty': -1,
+            'Stability': 1,
+            'corruption': 1,
+            'law': 1
+        },
+        "Caster's Tower": {
+            'size': '1x1',
+            'cost': 30,
+            'minorItems': 3,
+            'mediumItems': 2,
+            'Economy': 1,
+            'Loyalty': 1
+        },
+        'Castle': {
+            'size': '2x2',
+            'cost': 54,
+            'halveCost': ["Noble Villa", "Town Hall"],
+            'Economy': 2,
+            'Loyalty': 2,
+            'Stability': 2,
+            'Defense': 8,
+            'Unrest': -4,
+            'onePerCity': true,
+            'Fame': 1 // TODO
+        },
+        'Cathedral': {
+            'size': '2x2',
+            'cost': 58,
+            'halveCost': ["Temple", "Academy"],
+            'halveKingdom': 'Promotions',
+            'minorItems': 3, // TODO potions or wondrous items
+            'mediumItems': 2, // TODO potions or wondrous items
+            'Loyalty': 4,
+            'Stability': 4,
+            'Unrest': -4,
+            'onePerCity': true,
+            'Fame': 1, // TODO
+            'law': 2
+        },
+        'Cistern': {
+            'size': '1x1',
+            'cost': 6,
+            'Stability': 1
+            // TODO may not be adjacent to a Dump, Graveyard, Stable, Stockyard or Tannery
+            // TODO can share a lot with another building :(
+        },
+        'City Wall': {
+            'size': 'border',
+            'borderColour': '#666666',
+            'borderZ': 3,
+            'cost': 2,
+            'Defense': 1,
+            'Unrest': -2 // TODO once per settlement only
+        },
+        'City Wall with Watergate': {
+            'size': 'border',
+            'borderColour': '#666666',
+            'borderZ': 3,
+            'cost': 4,
+            'Defense': 1,
+            'Unrest': -2 // TODO once per settlement only
+        },
+        'Dance Hall': {
+            'size': '1x1',
+            'image': 'Brothel',
+            'cost': 4,
+            'adjacentHouses': 1,
+            'Economy': 1,
+            'Loyalty': 2,
+            'Unrest': 1,
+            'corruption': 1,
+            'crime': 1
+        },
+        'Dump': {
+            'size': '1x1',
+            'cost': 4,
+            'Stability': 1,
+            'noAdjacentHouses': true // includes Mansions and Noble Villas
+        },
+        'Everflowing Spring': {
+            'cost': 5
+            // TODO requires at least 1 medium magic item slot
+            // TODO shares a lot with Castle, Cathedral, Market, Monument, Park or Town Hall
+        },
+        'Exotic Artisan': {
+            'size': '1x1',
+            'image': 'Exotic Craftsman',
+            'cost': 10,
+            'adjacentHouses': 1,
+            'minorItems': 1, // TODO ring, wand or wondrous item
+            'Economy': 1,
+            'Stability': 1
+        },
+        'Foreign Quarter': {
+            'size': '2x2',
+            'cost': 30,
+            'Economy': 3,
+            'Stability': -1,
+            'crime': 1,
+            'lore': {'default': 1},
+            'society': 2
+            // TODO increases value of trade routes by 5% to a maximum of 100%
+        },
+        'Foundry': {
+            'size': '2x1',
+            'cost': 16,
+            'Economy': 1,
+            'Stability': 1,
+            'IncomeBP': 1,
+            'Unrest': 1,
+            'halveCost': ["Blacksmith"],
+            'adjacentWater': true,
+            'productivity': 1
+            // TODO increase the Economy and BP-per-turn from a connected mine :(
+        },
+        'Garrison': {
+            'size': '2x1',
+            'cost': 28,
+            'halveCost': ["City Wall", "Granary", "Jail"],
+            'Loyalty': 2,
+            'Stability': 2,
+            'Unrest': -2,
+        },
+        'Granary': {
+            'size': '1x1',
+            'cost': 12,
+            'Loyalty': 1,
+            'Stability': 1
+            // TODO if Consumption is < 0, store up to 5 BP to use to pay later Consumption
+        },
+        'Graveyard': {
+            'size': '1x1',
+            'cost': 4,
+            'Loyalty': 1
+        },
+        'Guildhall': {
+            'size': '2x1',
+            'cost': 34,
+            'adjacentHouses': 1,
+            'cityValue': 1000,
+            'halveCost': ["Pier", "Stable", "Trade Shop"],
+            'Economy': 2,
+            'Loyalty': 2,
+            'law': 1,
+            'productivity': 2
+        },
+        'Herbalist': {
+            'size': '1x1',
+            'cost': 10,
+            'adjacentHouses': 1,
+            'minorItems': 1, // TODO potion or wondrous item
+            'Loyalty': 1,
+            'Stability': 1
+        },
+        'Hospital': {
+            'size': '2x1',
+            'cost': 30,
+            'Loyalty': 1,
+            'Stability': 2,
+            'lore': {'default': 1},
+            'productivity': 2
+            // TODO Increase Stability by 2 during plague events
+        },
+        'House': {
+            'size': '1x1',
+            'cost': 3,
+            'extraBuild': 1,
+            'isHouse': true,
+            'Unrest': -1
+        },
+        'Inn': {
+            'size': '1x1',
+            'cost': 10,
+            'adjacentHouses': 1,
+            'cityValue': 500,
+            'Economy': 1,
+            'Loyalty': 1,
+            'society': 1
+        },
+        'Jail': {
+            'size': '1x1',
+            'cost': 14,
+            'Loyalty': 2,
+            'Stability': 2,
+            'Unrest': -2,
+            'crime': -1,
+            'law': 1
+        },
+        'Land': {
+            'size': 'border',
+            'borderColour': '#97974F',
+            'borderZ': 1,
+            'cost': 0
+        },
+        'Library': {
+            'size': '1x1',
+            'cost': 6,
+            'Economy': 1,
+            'Loyalty': 1,
+            'upgradeTo': 'Academy',
+            'lore': {'default': 1}
+        },
+        'Luxury Store': {
+            'size': '1x1',
+            'cost': 28,
+            'adjacentHouses': 1,
+            'upgradeTo': 'Magic Shop',
+            'cityValue': 2000,
+            'minorItems': 2, // TODO rings, wands or wondrous items
+            'Economy': 1
+        },
+        'Magic Shop': {
+            'size': '1x1',
+            'cost': 68,
+            'adjacentHouses': 2,
+            'cityValue': 2000,
+            'minorItems': 4, // TODO wondrous items
+            'mediumItems': 2, // TODO wondrous items
+            'majorItems': 1, // TODO wondrous items
+            'Economy': 1
+        },
+        'Magical Academy': {
+            'size': '2x1',
+            'cost': 58,
+            'Economy': 2,
+            'Fame': 1, // TODO
+            'halveCost': ["Caster's Tower", "Library", "Magic Shop"],
+            'minorItems': 3, // TODO potions, scrolls or wondrous items
+            'mediumItems': 1, // TODO potions, scrolls or wondrous items
+            'lore': {'default': 2, 'Knowledge (Arcana)': 2},
+            'society': 1
+        },
+        'Magical Streetlamps': {
+            // TODO can share a lot with building or improvement
+            'cost': 5,
+            // TODO Settlement must have a Cathedral, Magic Shop, Magical Academy or Temple
+            'crime': -1
+        },
+        'Mansion': {
+            'size': '1x1',
+            'cost': 10,
+            'Stability': 1,
+            'upgradeTo': 'Noble Villa',
+            'law': 1,
+            'society': 1
+        },
+        'Market': {
+            'size': '2x1',
+            'cost': 48,
+            'adjacentHouses': 2,
+            'cityValue': 2000,
+            'halveCost': ["Black Market", "Inn", "Shop"],
+            'minorItems': 2, // TODO wondrous items
+            'Economy': 2,
+            'Stability': 2
+        },
+        'Menagerie': {
+            'size': '2x2',
+            'cost': 16,
+            'Economy': 1,
+            'Loyalty': 0, // TODO 1/4 the CR of the highest CR creature on display
+            'Fame': 1
+        },
+        'Military Academy': {
+            'size': '2x1',
+            'cost': 36,
+            'Loyalty': 2,
+            'Stability': 2,
+            'Fame': 1, // TODO
+            'halveCost': ["Barracks"],
+            'onePerCity': true,
+            // TODO Armies and commanders recruited in city gain one bonus tactic
+            'minorItems': 1, // TODO armor, shield or weapon
+            'mediumItems': 1, // TODO armor, shield or weapon
+            'law': 1,
+            'lore': {'default': 1}
+        },
+        'Mill': {
+            'size': '1x1',
+            'cost': 6,
+            'adjacentWater': true,
+            'Economy': 1,
+            'Stability': 1,
+            'productivity': 1
+            // TODO Windmill with GM approval can ignore water border limit
+        },
+        'Mint': {
+            'size': '1x1',
+            'cost': 30,
+            'Economy': 3,
+            'Loyalty': 3,
+            'Stability': 1,
+            'Fame': 1 // TODO
+        },
+        'Moat': {
+            'size': 'border',
+            'borderColour': '#00f',
+            'borderZ': 3,
+            'cost': 2,
+            'Defense': 1,
+            'Unrest': -1 // TODO once per settlement only
+        },
+        'Monastery': {
+            'size': '2x1',
+            'cost': 16,
+            'Stability': 1,
+            'law': 1,
+            'lore': {'default': 1}
+        },
+        'Monument': {
+            'size': '1x1',
+            'cost': 6,
+            'Loyalty': 1,
+            'Unrest': -1
+        },
+        'Museum': {
+            'size': '2x1',
+            'cost': 30,
+            'Economy': 1,
+            'Loyalty': 1,
+            'Fame': 1, // TODO optional +1 per 10,000 gp of most valuable item (max +5), +1 more if significant to kingdom
+            'lore': {'default': 2, 'Knowledge (History)': 2, 'Appraise checks regarding art objects': 0},
+            'society': 1
+        },
+        'Noble Villa': {
+            'size': '2x1',
+            'cost': 24,
+            'halveCost': ["Exotic Artisan", "Luxury Store", "Mansion"],
+            'Economy': 1,
+            'Loyalty': 1,
+            'Stability': 1,
+            'Fame': 1, // TODO
+            'society': 1
+        },
+        'Observatory': {
+            'size': '1x1',
+            'cost': 12,
+            'Stability': 1,
+            'minorItems': 1, // TODO scroll or wondrous item
+            'lore': {'default': 2}
+        },
+        'Orphanage': {
+            'size': '1x1',
+            'cost': 6,
+            'Stability': 1,
+            'Unrest': -1
+        },
+        'Palace': {
+            'size': '2x2',
+            'cost': 108,
+            'Economy': 2,
+            'Loyalty': 6,
+            'Stability': 2,
+            'Fame': 1, // TODO
+            'halveCost': ["Mansion", "Mint", "Noble Villa"],
+            'cityValue': 1000,
+            'law': 2
+            // TODO may make two special edicts per turn but take -2 on checks for each
+        },
+        'Park': {
+            'size': '1x1',
+            'cost': 4,
+            'Loyalty': 1,
+            'Unrest': -1
+        },
+        'Paved Streets': {
+            'size': 'district', // TODO per-district
+            'cost': 24,
+            'Economy': 2,
+            'Stability': 1,
+            'productivity': 2
+        },
+        'Pier': {
+            'size': '1x1',
+            'cost': 16,
+            'adjacentWater': true,
+            'cityValue': 1000,
+            'upgradeTo': 'Waterfront',
+            'Economy': 1,
+            'Stability': 1,
+            'crime': 1
+        },
+        'Sewer System': {
+            'size': 'district', // TODO per-district
+            'cost': 24,
+            'Loyalty': 1,
+            'Stability': 2,
+            'halveCost': ["Cistern", "Dump"],
+            'crime': 1,
+            'productivity': 1
+        },
+        'Shop': {
+            'size': '1x1',
+            'cost': 8,
+            'adjacentHouses': 1, // TODO also Mansion
+            'cityValue': 500,
+            'upgradeTo': ["Luxury Store", "Market"],
+            'Economy': 1,
+            'productivity': 1
+        },
+        'Shrine': {
+            'size': '1x1',
+            'cost': 8,
+            'minorItems': 1, // TODO potion, scroll, wondrous item
+            'upgradeTo': 'Temple',
+            'Loyalty': 1,
+            'Unrest': -1
+        },
+        'Smithy': {
+            'size': '1x1',
+            'image': 'Smith',
+            'cost': 6,
+            'Economy': 1,
+            'Stability': 1
+        },
+        'Stable': {
+            'size': '1x1',
+            'cost': 10,
+            'Economy': 1,
+            'Loyalty': 1,
+            'adjacentHouses': 1, // also Mansion or Noble Villa
+            'cityValue': 500
+        },
+        'Stockyard': {
+            'size': '2x2',
+            'cost': 20,
+            'Economy': 1,
+            'Stability': -1,
+            'halveCost': ["Stable", "Tannery"],
+            'productivity': 1
+            // TODO Farms in this or adjacent hexes reduce Consumption by 3 instead of 2
+        },
+        'Tannery': {
+            'size': '1x1',
+            'cost': 6,
+            'Economy': 1,
+            'Stability': 1,
+            'noAdjacentHouses': true, // includes Mansions and Noble Villas
+            'society': -1
+        },
+        'Tavern': {
+            'size': '1x1',
+            'cost': 12,
+            'Economy': 1,
+            'Loyalty': 1,
+            'adjacentHouses': 1,
+            'cityValue': 500,
+            'corruption': 1
+        },
+        'Temple': {
+            'size': '2x1',
+            'cost': 32,
+            'Loyalty': 2,
+            'Stability': 2,
+            'Unrest': -2,
+            'halveCost': ["Graveyard", "Monument", "Shrine"],
+            'minorItems': 2
+        },
+        'Tenement': {
+            'size': '1x1',
+            'cost': 1,
+            'Unrest': 2,
+            'isHouse': true,
+            'upgradeTo': "House"
+        },
+        'Theater': {
+            'size': '2x1',
+            'cost': 24,
+            'Economy': 2,
+            'Stability': 2,
+            'halveCost': ["Dance Hall", "Exotic Artisan", "Inn", "Park", "Tavern"],
+            'upgradeTo': "Arena"
+        },
+        'Town Hall': {
+            'size': '2x1',
+            'cost': 22,
+            'Economy': 1,
+            'Loyalty': 1,
+            'Stability': 1,
+            'halveCost': ["Barracks", "Cistern", "Dump", "Jail", "Watchtower"],
+            'law': 1
+        },
+        'Trade Shop': {
+            'size': '1x1',
+            'image': 'Tradesman',
+            'cost': 10,
+            'Economy': 1,
+            'Stability': 1,
+            'adjacentHouses': 1,
+            'upgradeTo': "Guildhall",
+            'cityValue': 500,
+            'productivity': 1
+        },
+        'University': {
+            'size': '2x2',
+            'cost': 78,
+            'Economy': 3,
+            'Loyalty': 3,
+            'Fame': 1, // TODO
+            'halveCost': ["Academy", "Bardic College", "Library", "Magical Academy", "Military Academy", "Museum"],
+            'minorItems': 4, // TODO scrolls or wondrous items
+            'mediumItems': 2, // TODO scrolls or wondrous items
+            'lore': {'default': 4, 'Nominated Knowledge or Profession skill': 4}, // TODO +4 more to a nominated Knowledge or Profession skill
+            'society': 3
+        },
+        'Watchtower': {
+            'size': '1x1',
+            'cost': 12,
+            'Stability': 1,
+            'Defense': 2,
+            'Unrest': -1
+        },
+        'Water': {
+            'size': 'border',
+            'borderColour': '#7777ff',
+            'borderZ': 2,
+            'onlyEmpty': true,
+            'cost': 0
+        },
+        'Waterfront': {
+            'size': '2x2',
+            'cost': 90,
+            'Economy': 4,
+            'halveCost': ["Black Market", "Guildhall", "Market", "Pier"],
+            'adjacentWater': true,
+            'onePerCity': true,
+            'cityValue': 4000,
+            'halveKingdom': 'Taxation',
+            'minorItems': 2, // TODO wondrous items
+            'mediumItems': 1, // TODO wondrous items
+            'majorItems': 1, // TODO wondrous items
+            'productivity': 2
+        },
+        'Waterway 1x1': {
+            'size': '1x1',
+            'cost': 3
+            // TODO counts as a water border for adjacent houses
+            // TODO there are several waterway images in UC
+        },
+        'Waterway 2x1': {
+            'size': '2x1',
+            'cost': 3
+            // TODO counts as a water border for adjacent houses
+            // TODO there are several waterway images in UC
+        }
+    },
+
+    riversRunRedBuildingData: {
+        'continue': {},
+        'Academy': {
+            'size': '2x1',
+            'cost': 52,
+            'halveCost': ["Caster's Tower", "Library", "Magic Shop"],
+            'minorItems': 3,
+            'mediumItems': 2,
+            'Economy': 2,
+            'Loyalty': 2
+        },
+        'Alchemist': {
+            'size': '1x1',
+            'cost': 18,
+            'adjacentHouses': 1,
+            'cityValue': 1000,
+            'minorItems': 1,
+            'Economy': 1
+        },
+        'Arena': {
+            'size': '2x2',
+            'cost': 40,
+            'halveCost': ["Garrison", "Theater"],
+            'halveKingdom': 'Festivals',
+            'Stability': 4,
+            'onePerCity': true
+        },
+        'Barracks': {
+            'size': '1x1',
+            'cost': 6,
+            'Defense': 2,
+            'Unrest': -1
+        },
+        'Black Market': {
+            'size': '1x1',
+            'cost': 50,
+            'adjacentHouses': 2,
+            'cityValue': 2000,
+            'minorItems': 2,
+            'mediumItems': 1,
+            'majorItems': 1,
+            'Economy': 2,
+            'Stability': 2,
+            'Unrest': 1
+        },
+        'Brewery': {
+            'size': '1x1',
+            'cost': 6,
+            'Loyalty': 1,
+            'Stability': 1
+        },
+        'Brothel': {
+            'size': '1x1',
+            'cost': 4,
+            'adjacentHouses': 1,
+            'Economy': 1,
+            'Loyalty': 2,
+            'Unrest': 1
+        },
+        "Caster's Tower": {
+            'size': '1x1',
+            'cost': 30,
+            'minorItems': 3,
+            'mediumItems': 2,
+            'Economy': 1,
+            'Loyalty': 1
+        },
+        'Castle': {
+            'size': '2x2',
+            'cost': 54,
+            'halveCost': ["Noble Villa", "Town Hall"],
+            'Economy': 2,
+            'Loyalty': 2,
+            'Stability': 2,
+            'Defense': 8,
+            'Unrest': -4,
+            'onePerCity': true
+        },
+        'Cathedral': {
+            'size': '2x2',
+            'cost': 58,
+            'halveCost': ["Temple", "Academy"],
+            'halveKingdom': 'Promotions',
+            'minorItems': 3,
+            'mediumItems': 2,
+            'Loyalty': 4,
+            'Unrest': -4,
+            'onePerCity': true
+        },
+        'City Wall': {
+            'size': 'border',
+            'borderColour': '#666666',
+            'borderZ': 3,
+            'cost': 8,
+            'Defense': 4,
+            'Unrest': -2
+        },
+        'Dump': {
+            'size': '1x1',
+            'cost': 4,
+            'Stability': 1
+        },
+        'Exotic Craftsman': {
+            'size': '1x1',
+            'cost': 10,
+            'adjacentHouses': 1,
+            'minorItems': 1,
+            'Economy': 1,
+            'Stability': 1
+        },
+        'Garrison': {
+            'size': '2x1',
+            'cost': 28,
+            'halveCost': ["City Wall", "Granary", "Jail"],
+            'Loyalty': 2,
+            'Stability': 2,
+            'Unrest': -2,
+        },
+        'Granary': {
+            'size': '1x1',
+            'cost': 12,
+            'Loyalty': 1,
+            'Stability': 1
+        },
+        'Graveyard': {
+            'size': '1x1',
+            'cost': 4,
+            'Loyalty': 1
+        },
+        'Guildhall': {
+            'size': '2x1',
+            'cost': 34,
+            'adjacentHouses': 1,
+            'cityValue': 1000,
+            'halveCost': ["Pier", "Stable", "Tradesman"],
+            'Economy': 2,
+            'Loyalty': 2
+        },
+        'Herbalist': {
+            'size': '1x1',
+            'cost': 10,
+            'adjacentHouses': 1,
+            'minorItems': 1,
+            'Loyalty': 1,
+            'Stability': 1
+        },
+        'House': {
+            'size': '1x1',
+            'cost': 3,
+            'extraBuild': 1,
+            'isHouse': true,
+            'Unrest': -1
+        },
+        'Inn': {
+            'size': '1x1',
+            'cost': 10,
+            'adjacentHouses': 1,
+            'cityValue': 500,
+            'Economy': 1,
+            'Loyalty': 1
+        },
+        'Jail': {
+            'size': '1x1',
+            'cost': 14,
+            'Loyalty': 2,
+            'Stability': 2,
+            'Unrest': -2
+        },
+        'Land': {
+            'size': 'border',
+            'borderColour': 'tan',
+            'borderZ': 1,
+            'cost': 0
+        },
+        'Library': {
+            'size': '1x1',
+            'cost': 6,
+            'Economy': 1,
+            'Loyalty': 1
+        },
+        'Luxury Store': {
+            'size': '1x1',
+            'cost': 28,
+            'adjacentHouses': 1,
+            'cityValue': 2000,
+            'minorItems': 2,
+            'Economy': 1
+        },
+        'Magic Shop': {
+            'size': '1x1',
+            'cost': 68,
+            'adjacentHouses': 2,
+            'cityValue': 2000,
+            'minorItems': 4,
+            'mediumItems': 2,
+            'majorItems': 1,
+            'Economy': 1
+        },
+        'Mansion': {
+            'size': '1x1',
+            'cost': 10,
+            'Stability': 1
+        },
+        'Market': {
+            'size': '2x1',
+            'cost': 48,
+            'adjacentHouses': 2,
+            'cityValue': 2000,
+            'halveCost': ["Black Market", "Inn", "Shop"],
+            'minorItems': 2,
+            'Economy': 2,
+            'Stability': 2
+        },
+        'Mill': {
+            'size': '1x1',
+            'cost': 6,
+            'adjacentWater': true,
+            'Economy': 1,
+            'Stability': 1
+        },
+        'Monument': {
+            'size': '1x1',
+            'cost': 6,
+            'Loyalty': 3,
+            'Unrest': -1
+        },
+        'Noble Villa': {
+            'size': '2x1',
+            'cost': 24,
+            'halveCost': ["Exotic Craftsman", "Luxury Store", "Mansion"],
+            'Economy': 1,
+            'Loyalty': 1,
+            'Stability': 1
+        },
+        'Park': {
+            'size': '1x1',
+            'cost': 4,
+            'Loyalty': 1,
+            'Unrest': -1
+        },
+        'Pier': {
+            'size': '1x1',
+            'cost': 16,
+            'adjacentWater': true,
+            'cityValue': 1000,
+            'Economy': 1,
+            'Stability': 1
+        },
+        'Shop': {
+            'size': '1x1',
+            'cost': 8,
+            'adjacentHouses': 1,
+            'cityValue': 500,
+            'Economy': 1
+        },
+        'Shrine': {
+            'size': '1x1',
+            'cost': 8,
+            'minorItems': 1,
+            'Loyalty': 1,
+            'Unrest': -1
+        },
+        'Smith': {
+            'size': '1x1',
+            'cost': 6,
+            'Economy': 1,
+            'Stability': 1
+        },
+        'Stable': {
+            'size': '1x1',
+            'cost': 10,
+            'adjacentHouses': 1,
+            'cityValue': 500,
+            'Economy': 1,
+            'Loyalty': 1
+        },
+        'Tannery': {
+            'size': '1x1',
+            'cost': 6,
+            'noAdjacentHouses': true,
+            'Economy': 1,
+            'Stability': 1
+        },
+        'Tavern': {
+            'size': '1x1',
+            'cost': 12,
+            'adjacentHouses': 1,
+            'cityValue': 500,
+            'Economy': 1,
+            'Loyalty': 1
+        },
+        'Temple': {
+            'size': '2x1',
+            'cost': 32,
+            'halveCost': ["Graveyard", "Monument", "Shrine"],
+            'minorItems': 2,
+            'Loyalty': 2,
+            'Stability': 2,
+            'Unrest': -2
+        },
+        'Tenement': {
+            'size': '1x1',
+            'cost': 1,
+            'Unrest': 2,
+            'isHouse': true,
+            'upgradeTo': "House"
+        },
+        'Theater': {
+            'size': '2x1',
+            'cost': 24,
+            'halveCost': ["Brothel", "Park", "Tavern"],
+            'Economy': 2,
+            'Stability': 2
+        },
+        'Town Hall': {
+            'size': '2x1',
+            'cost': 22,
+            'halveCost': ["Barracks", "Dump", "Watchtower"],
+            'Economy': 1,
+            'Loyalty': 1,
+            'Stability': 1
+        },
+        'Tradesman': {
+            'size': '1x1',
+            'cost': 10,
+            'adjacentHouses': 1,
+            'cityValue': 500,
+            'Economy': 1,
+            'Stability': 1
+        },
+        'Watchtower': {
+            'size': '1x1',
+            'cost': 12,
+            'Stability': 1,
+            'Defense': 2,
+            'Unrest': -1
+        },
+        'Water': {
+            'size': 'border',
+            'borderColour': '#7777ff',
+            'borderZ': 2,
+            'onlyEmpty': true,
+            'cost': 0
+        },
+        'Waterfront': {
+            'size': '2x2',
+            'cost': 90,
+            'adjacentWater': true,
+            'cityValue': 4000,
+            'minorItems': 3,
+            'mediumItems': 2,
+            'majorItems': 1,
+            'halveCost': ["Guildhall", "Market"],
+            'halveKingdom': 'Taxation',
+            'Economy': 4,
+            'onePerCity': true
+        }
+    },
+
     init: function (name) {
         this.name = name;
         if (name == 'continue')
             return;
-        else if (!$.kingdom.Building.buildingData[name])
+        else if (!$.kingdom.Building.buildingData[name]) {
             alert('Unknown building "' + name + '"');
+            return;
+        }
         if (this.getImage())
             this.image = "images/" + this.getImage() + ".png";
         else
@@ -2698,7 +2823,7 @@ $.kingdom.Building = Class.create({
         if (this.getAdjacentHouses())
             result += "\nMust be adjacent to at least " + this.getAdjacentHouses() + " house" + ((this.getAdjacentHouses() > 1) ? "s." : ".");
         if (this.getAdjacentWater())
-            result += "\nMust be adjacent to a water border.";
+            result += "\nMust be adjacent to water.";
         if (this.getNoAdjacentHouses())
             result += "\nMust not be adjacent to any houses.";
         if (this.getHalveCost())
@@ -2730,14 +2855,14 @@ $.kingdom.Building = Class.create({
         if (this.getHalveKingdom())
             result += "\nHalves the overhead of " + this.getHalveKingdom() + " Kingdom-wide (doesn't stack).";
         if (this.getCorruption())
-            result += "\nSettlement Corruption " + this.getCorruption().plus() + ".";
+            result += "\nSettlement - Corruption " + this.getCorruption().plus() + ".";
         if (this.getCrime())
-            result += "\nSettlement Crime " + this.getCrime().plus() + ".";
+            result += "\nSettlement - Crime " + this.getCrime().plus() + ".";
         if (this.getLaw())
-            result += "\nSettlement Law " + this.getLaw().plus() + ".";
+            result += "\nSettlement - Law " + this.getLaw().plus() + ".";
         if (this.getLore()) {
             var lore = this.getLore();
-            result += "\nSettlement Lore " + lore['default'].plus();
+            result += "\nSettlement - Lore " + lore['default'].plus();
             $.each(lore, function (key, value) {
                 if (value == 0) {
                     result += ', Lore bonus applies to ' + key;
@@ -2748,9 +2873,9 @@ $.kingdom.Building = Class.create({
             result += ".";
         }
         if (this.getProductivity())
-            result += "\nSettlement Productivity " + this.getProductivity().plus() + ".";
+            result += "\nSettlement - Productivity " + this.getProductivity().plus() + ".";
         if (this.getSociety())
-            result += "\nSettlement Society " + this.getSociety().plus() + ".";
+            result += "\nSettlement - Society " + this.getSociety().plus() + ".";
         if (htmlBreaks) {
             result = result.replace(/\n/g, '<br/>');
         }
@@ -2758,6 +2883,9 @@ $.kingdom.Building = Class.create({
     },
 
     apply: function (city) {
+        if (!this.valid()) {
+            return;
+        }
         if (this.getHalveCost()) {
             $.each(this.getHalveCost(), function (index, building) {
                 city.halfCost[building] = true;
@@ -2832,6 +2960,10 @@ $.kingdom.Building = Class.create({
         } else if (this.getSize() == '2x2') {
             return 4;
         }
+    },
+
+    valid: function () {
+        return $.kingdom.Building.buildingData[this.name] !== undefined;
     },
 
     getImage: function () {
@@ -3158,7 +3290,7 @@ $.kingdom.District = Class.create({
     renderBorder: function (side) {
         var index = this.sideToIndex(side);
         var border = this.buildings[index];
-        if (border) {
+        if (border && border.valid()) {
             var borderDiv = $('<div></div>').addClass('border');
             borderDiv.addClass(side);
             if (!isTouchDevice()) {
@@ -3394,7 +3526,7 @@ $.kingdom.District = Class.create({
 
     isEnoughRoom: function (building, index) {
         if (building.getSize() == 'border') {
-            return (this.buildings[index].name == 'Land');
+            return (this.buildings[index].name != 'Water');
         } else if (this.buildings[index]) {
             return false;
         } else if (building.getSize() == "2x1") {
@@ -3418,7 +3550,7 @@ $.kingdom.District = Class.create({
         if (building.getOnePerCity() && this.city.onlyOne[building.name])
             problem = "already one in this city";
         else if (building.getAdjacentWater() && !this.isAdjacentToWater(index, building))
-            problem = "not adjacent to a water border";
+            problem = "not adjacent to water";
         else if (building.getAdjacentHouses() && this.countAdjacentHouses(index) < building.getAdjacentHouses())
             problem = "not adjacent to at least " + building.getAdjacentHouses() + " house" + ((building.getAdjacentHouses() > 1) ? "s" : "");
         else if (building.getNoAdjacentHouses() && this.countAdjacentHouses(index) > 0)
@@ -3694,7 +3826,7 @@ $.kingdom.City = Class.create({
     },
 
     reset: function () {
-        this.value = 200;
+        this.value = (this.kingdom.getChoice('ruleset') == 'UC') ? 0 : 200;
         this.minorItems = 0;
         this.mediumItems = 0;
         this.majorItems = 0;
@@ -3951,15 +4083,58 @@ $.kingdom.City = Class.create({
                 } else {
                     totals[item.classification]++;
                 }
+                if (this.kingdom.getChoice('ruleset') == 'UC') {
+                    return slot;
+                }
             }
         }
     },
 
+    randomSlot: function (type, number, hits, selected) {
+        // I love the reservoir algorithm
+        for (var slot = 0; slot < number; ++slot) {
+            if (this.itemSlots[type][slot] == null && parseInt(Math.random() * ++hits) == 0) {
+                selected.type = type;
+                selected.numSlots = number;
+            }
+        }
+        return hits;
+    },
+
     fillItemSlots: function (totals) {
-        this.fillItemSlotsOfType('minor', this.minorItems, totals);
-        this.fillItemSlotsOfType('medium', this.mediumItems, totals);
-        this.fillItemSlotsOfType('major', this.majorItems, totals);
+        if (this.kingdom.getChoice('ruleset') == 'UC') {
+            for (var district = 0; district < this.districts.length; ++district) {
+                if (Math.random() < 0.5) {
+                    // fill one random item slot
+                    var tries = 100;
+                    while (tries-- > 0) {
+                        var hits = 0, selected = {};
+                        hits = this.randomSlot('minor', this.minorItems, hits, selected);
+                        hits = this.randomSlot('medium', this.mediumItems, hits, selected);
+                        hits = this.randomSlot('major', this.majorItems, hits, selected);
+                        if (selected.type) {
+                            var itemSlot = this.fillItemSlotsOfType(selected.type, selected.numSlots, totals);
+                            if (this.kingdom.getChoice('hrUnlimitedItems') || this.itemSlots[selected.type][itemSlot].value <= this.value) {
+                                break;
+                            } else {
+                                // Pick a different item (in a potentially different slot) and try again
+                                this.itemSlots[selected.type][itemSlot] = null;
+                                totals[selected.type]--;
+                            }
+                        } else {
+                            // No available slots
+                            return;
+                        }
+                    }
+                }
+            }
+        } else {
+            this.fillItemSlotsOfType('minor', this.minorItems, totals);
+            this.fillItemSlotsOfType('medium', this.mediumItems, totals);
+            this.fillItemSlotsOfType('major', this.majorItems, totals);
+        }
         this.refreshItemSlots();
+        this.save();
     },
 
     emptyCheapItemSlotsOfType: function (type, number) {
@@ -4018,35 +4193,38 @@ $.kingdom.City = Class.create({
         output += "<b>Defense:</b> " + this.defense + "<br/>";
         output += "<b>Population:</b> " + this.population.commafy() + "<br/>";
         output += "<b>Half cost buildings:</b> " + Object.keys(this.halfCost).sort().joinAnd() + "<br/>";
-         output += "<b>Minor items (DC 20 for 2 BPs):</b> " + this.minorItems + " <span class='itemslots' type='minor' count='" + this.minorItems + "'></span><br/>";
-         output += "<b>Medium items (DC 35 for 8 BPs):</b> " + this.mediumItems + " <span class='itemslots' type='medium' count='" + this.mediumItems + "'></span><br/>";
-         output += "<b>Major items (DC 50 for 15 BPs):</b> " + this.majorItems + " <span class='itemslots' type='major' count='" + this.majorItems + "'></span><br/>";
+        if (this.kingdom.getBooleanChoice('hrSlotsBoostEconomy')) {
+            output += '<b>Item slots:</b> ' + this.minorItems + ' minor, ' + this.mediumItems + ' medium, ' + this.majorItems + ' major<br/>';
+        } else {
+            output += "<b>Minor items (DC 20 for 2 BPs):</b> " + this.minorItems + " <span class='itemslots' type='minor' count='" + this.minorItems + "'></span><br/>";
+            output += "<b>Medium items (DC 35 for 8 BPs):</b> " + this.mediumItems + " <span class='itemslots' type='medium' count='" + this.mediumItems + "'></span><br/>";
+            output += "<b>Major items (DC 50 for 15 BPs):</b> " + this.majorItems + " <span class='itemslots' type='major' count='" + this.majorItems + "'></span><br/>";
+        }
         var settlement = '';
         if (this.corruption)
-            settlement += "<b>Corruption:</b> " + this.corruption.plus() + " to Bluff checks against city officials and Stealth checks made outside.<br/>";
+            settlement += "<b title='Bluff checks against city officials and Stealth checks made in the streets'>Corruption:</b> " + this.corruption.plus() + "<br/>";
         if (this.crime)
-            settlement += "<b>Crime:</b> " + this.crime.plus() + " to Sense Motive checks to avoid being bluffed and Slight of Hand checks to pick pockets.<br/>";
+            settlement += "<b title='Sense Motive checks to avoid being bluffed and Slight of Hand checks to pick pockets'>Crime:</b> " + this.crime.plus() + "<br/>";
         if (this.law)
-            settlement += "<b>Law:</b> " + this.law.plus() + " to Intimidate checks to avoid violence, Diplomacy checks against city officials, and when calling the city guard.<br/>";
+            settlement += "<b title='Intimidate checks to avoid violence, Diplomacy checks against city officials, and when calling the city guard'>Law:</b> " + this.law.plus() + "<br/>";
         if (this.lore['default']) {
-            settlement += "<b>Lore:</b> " + this.lore['default'].plus() + " to Diplomacy checks to gather information";
+            settlement += "<b title='Diplomacy checks to gather information and Knowledge checks'>Lore:</b> " + this.lore['default'].plus();
             var suffix = '';
             $.each(this.lore, $.proxy(function (key, value) {
                 if (value == 0)
-                    settlement += ", " + key;
+                    settlement += ", applies to " + key;
                 else if (key != 'default')
-                    suffix += ' ' + (this.lore['default'] + value).plus() + " total to " + key + '.';
+                    suffix += ', ' + (this.lore['default'] + value).plus() + " total to " + key;
             }, this));
-            settlement += " and Knowledge checks.";
             settlement += suffix;
             settlement += "<br/>";
         }
         if (this.productivity)
-            settlement += "<b>Productivity:</b> " + this.productivity.plus() + " to Craft, Perform and Profession checks made to generate income.<br/>";
+            settlement += "<b title='Craft, Perform and Profession checks made to generate income'>Productivity:</b> " + this.productivity.plus() + "<br/>";
         if (this.society)
-            settlement += "<b>Society:</b> " + this.society.plus() + " to Disguise checks and Diplomacy checks against civilians.<br/>";
+            settlement += "<b title='Disguise checks and Diplomacy checks against civilians'>Society:</b> " + this.society.plus() + "<br/>";
         if (settlement)
-            output += '<b>Within this settlement:</b><div class="settlementStats">' + settlement + '</div>';
+            output += '<b>Settlement:</b><div class="settlementStats">' + settlement + '</div>';
         this.statblock.html(output);
         this.refreshItemSlots();
     },
@@ -5440,7 +5618,7 @@ $.kingdom.Resource = Class.create({
 
     idPrefix: 'resource.',
 
-    statList: ['Economy', 'Loyalty', 'Stability'],
+    statList: ['Economy', 'Loyalty', 'Stability', 'IncomeBP', 'Consumption'],
 
     init: function (kingdom, index) {
         this.kingdom = kingdom;
@@ -5475,7 +5653,7 @@ $.kingdom.Resource = Class.create({
     apply: function () {
         $.each(this.statList, $.proxy(function (index, name) {
             if (this.stats[name])
-                this.kingdom.modify(name, this.stats[name], "Other");
+                this.kingdom.modify(name, this.stats[name], "Resources");
         }, this));
     },
 
@@ -5534,10 +5712,22 @@ $.kingdom.ResourceTable = Class.create({
         this.addCell(newRow, resource.getStat('Economy'), this.finishEditingEconomy);
         this.addCell(newRow, resource.getStat('Loyalty'), this.finishEditingLoyalty);
         this.addCell(newRow, resource.getStat('Stability'), this.finishEditingStability);
+	    this.addCell(newRow, resource.getStat('IncomeBP'), this.finishEditingIncomeBP);
+	    this.addCell(newRow, resource.getStat('Consumption'), this.finishEditingConsumption);
         this.resourcesTable.append(newRow);
         this.kingdom.setChoice(this.resourceCountId, this.resources.length);
         if (editNameImmediately)
             descriptionCell.click();
+    },
+
+    createResource: function (name, data) {
+        var index = this.resources.length;
+        var resource = new $.kingdom.Resource(this.kingdom, index);
+        resource.setDescription(name);
+        $.each(data, function (name, value) {
+            resource.setStat(name, value);
+        });
+        this.addResource(index, false);
     },
 
     finishEditingDescription: function (element, newValue, oldValue) {
@@ -5578,6 +5768,14 @@ $.kingdom.ResourceTable = Class.create({
 
     finishEditingStability: function (element, newValue) {
         this.finishEditingStat(element, 'Stability', newValue);
+    },
+
+    finishEditingIncomeBP: function(element, newValue) {
+        this.finishEditingStat(element, 'IncomeBP', newValue);
+    },
+
+    finishEditingConsumption: function(element, newValue) {
+        this.finishEditingStat(element, 'Consumption', newValue);
     },
 
     apply: function () {

@@ -39,9 +39,10 @@
             <p><label><input type="checkbox" id="hrMansionVilla"> Mansions and Noble Villas are considered houses.</label></p>
         </div>
         <div id="hrUCOnly">
+            <p><label><input type="checkbox" id="hrUnlimitedItems"> When filling magic item slots, allow generated items to exceed settlement base value.</label></p>
         </div>
-        <p><label><input type="checkbox" id="hrCalculateEconomyBoost"> Magic item slots simply boost Economy instead of filling with items that you roll to sell each turn.</label></p>
-        <p><label><input type="checkbox" id="hrCalculatePrice"> Building prices are calculated from their features.</label></p>
+        <p><label><input type="checkbox" id="hrSlotsBoostEconomy"> Magic item slots simply boost Economy (+1 for minor, +2 for medium, +3 for major) instead of filling with items that you roll to sell each turn.</label></p>
+        <p><label><input type="checkbox" id="hrCalculatePrice"> Building prices are calculated from their features using <a href="http://paizo.com/threads/rzs2kqjx&page=16?Kingdom-Building#767" target="_blank">the values reverse-engineered by bmcdaniel</a></label></p>
         <button id="houseRulesClose">Close</button>
     </div>
 
@@ -79,6 +80,11 @@
                 <td><select name="roads"></select></td>
             </tr>
 
+            <tr class="ucOnly">
+                <th>Highways</th>
+                <td><select name="highways"></select></td>
+            </tr>
+
             <tr>
                 <th>Farms</th>
                 <td><select name="farms"></select></td>
@@ -92,6 +98,11 @@
             <tr>
                 <th>Treasury</th>
                 <td><input type="text" name="treasury" value="0" size="4" /> BP</td>
+            </tr>
+
+            <tr>
+                <th>Resource Income</th>
+                <td> <span class="fromKingdom IncomeBP plusNumber"></span> BP</td>
             </tr>
 
         </table>
@@ -206,6 +217,7 @@
             <th>Resources</th>
             <th>Alignment</th>
             <th>Roads</th>
+            <th class="ucOnly">Highways</th>
             <th>Other</th>
             <th>Edicts</th>
             <th>Unrest</th>
@@ -223,6 +235,7 @@
             <td class="fromKingdom Resources_Economy"></td>
             <td class="fromKingdom Alignment_Economy"></td>
             <td class="fromKingdom Roads_Economy"></td>
+            <td class="fromKingdom Highways_Economy ucOnly"></td>
             <td class="fromKingdom Other_Economy_Plus"></td>
             <td class="fromKingdom Edicts_Economy_Minus"></td>
             <td class="fromKingdom Unrest_Economy_Minus"></td>
@@ -240,6 +253,7 @@
             <td class="fromKingdom Resources_Loyalty"></td>
             <td class="fromKingdom Alignment_Loyalty"></td>
             <td class="fromKingdom Roads_Loyalty"></td>
+            <td class="fromKingdom Highways_Loyalty ucOnly"></td>
             <td class="fromKingdom Other_Loyalty_Plus"></td>
             <td class="fromKingdom Edicts_Loyalty_Minus"></td>
             <td class="fromKingdom Unrest_Loyalty_Minus"></td>
@@ -257,6 +271,7 @@
             <td class="fromKingdom Resources_Stability"></td>
             <td class="fromKingdom Alignment_Stability"></td>
             <td class="fromKingdom Roads_Stability"></td>
+            <td class="fromKingdom Highways_Stability ucOnly"></td>
             <td class="fromKingdom Other_Stability_Plus"></td>
             <td class="fromKingdom Edicts_Stability_Minus"></td>
             <td class="fromKingdom Unrest_Stability_Minus"></td>
@@ -273,8 +288,9 @@
             <th>New Cities</th>
             <th>New Buildings</th>
             <th>Claim Hexes (1 BP)</th>
-            <th title="Plains and Hills 1 BP, Forests 2 BP, Swamps and Mountains 4 BP, double to cross a river without an existing bridge or ford">Build Roads (1/2/4/8 BP)</th>
-            <th title="Plains 2 BP, Hills 4 BP">Build Farmlands (2/4 BP)</th>
+            <th class="rrrOnly" title="Plains and Hills 1 BP, Forests 2 BP, Swamps and Mountains 4 BP, double to cross a river without an existing bridge or ford">Build Roads (1/2/4/8 BP)</th>
+            <th class="rrrOnly" title="Plains 2 BP, Hills 4 BP">Build Farmlands (2/4 BP)</th>
+            <th class="ucOnly">Terrain Improvements</th>
         </tr>
 
         <tr>
@@ -282,8 +298,9 @@
             <td class="fromKingdom limitCities"></td>
             <td><span class="fromKingdom limitBuildings"></span> (+1 house)</td>
             <td class="fromKingdom limitHexes"></td>
-            <td class="fromKingdom limitRoads"></td>
-            <td class="fromKingdom limitFarmlands"></td>
+            <td class="rrrOnly fromKingdom limitRoads"></td>
+            <td class="rrrOnly fromKingdom limitFarmlands"></td>
+            <td class="ucOnly fromKingdom limitTerrain"></td>
         </tr>
 
     </table>
@@ -361,6 +378,8 @@
                     <th>Economy</th>
                     <th>Loyalty</th>
                     <th>Stability</th>
+                    <th>Income (+BP)</th>
+                    <th>Consumption</th>
                 </tr>
 
             </thead>
@@ -412,7 +431,7 @@
 
         <h1>Kingdom Turn <span class="expando">[+]</span></h1>
         <div>
-            <div class="RRR">
+            <div>
                 <ol start="0">
                     <li>Advance calendar month: <span class="calendar">Calendar</span>
                         <button class="calendarMinus">-</button>
@@ -426,66 +445,100 @@
                             <li><input type="button" value="Pay Consumption" id="payConsumptionButton"/>
                                 <div id="payConsumptionOutput" class="output"></div>
                             </li>
-                            <li><input type="button" value="Fill Vacant Magic Item Slots" id="fillItemSlots"/>
+                            <li class="laboriousItemSlots"><input type="button" value="Fill Vacant Magic Item Slots" id="fillItemSlots"/>
                                 <div id="fillItemSlotsOutput" class="output"></div>
                             </li>
-                            <li>Deal With Unrest (if unrest is 11 or higher).</li>
+                            <li><input class="ucOnly" type="button" value="Modify Unrest" id="modifyUnrestButton"/>
+                                <div id="modifyUnrestOutput" class="output"></div>
+                                Deal With Unrest (if unrest is 11 or higher).</li>
                         </ol>
                     </li>
                     <li>Improvement Phase
                         <ol type="a">
                             <li>Assign Leadership Roles</li>
-                            <li>Claim Hexes (limit of <span class="fromKingdom limitHexes"></span> per month)
+                            <li>Claim or Abandon Hexes (claim limit of <span class="fromKingdom limitHexes"></span> per month)
                                 <input type="button" value="Claim one hex for 1 BP" id="claimHexButton"/>
                                 <div id="claimHexOutput" class="output"></div>
                             </li>
-                            <li><span>Improve Hexes <span class="expando">[-]</span></span>
+                            <li><span>Improve Terrain <span class="ucOnly">(limit of <span class="fromKingdom limitTerrain"></span> per month)</span> <span class="expando">[-]</span></span>
                                 <ul>
                                     <li>
-                                        Build roads (limit of <span class="fromKingdom limitRoads"></span> per month):
+                                        Build roads<span class="rrrOnly"> (limit of <span class="fromKingdom limitRoads"></span> per month)</span>:
                                         <ul>
                                             <li>
                                                 Just roads:
-                                                <input type="button" value="plains/hills (1 BP)" name="1" class="buildRoadButton"/>
+                                                <input type="button" value="plains/hills (1 BP)" name="1" class="buildRoadButton rrrOnly"/>
+                                                <input type="button" value="plains (1 BP)" name="1" class="buildRoadButton ucOnly"/>
                                                 <input type="button" value="forest (2 BP)" name="2" class="buildRoadButton"/>
-                                                <input type="button" value="swamps/mountains (4 BP)" name="4" class="buildRoadButton"/>
+                                                <input type="button" value="hills (3 BP)" name="3" class="buildRoadButton ucOnly"/>
+                                                <input type="button" value="other terrain (4 BP)" name="4" class="buildRoadButton"/>
                                             </li>
                                             <li>
                                                 Plus bridge:
-                                                <input type="button" value="plains/hills with river (2 BP)" name="2" class="buildRoadButton"/>
+                                                <input type="button" value="plains/hills with river (2 BP)" name="2" class="buildRoadButton rrrOnly"/>
+                                                <input type="button" value="plains with river (2 BP)" name="2" class="buildRoadButton ucOnly"/>
                                                 <input type="button" value="forest with river (4 BP)" name="4" class="buildRoadButton"/>
-                                                <input type="button" value="swamps/mountains with river (8 BP)" name="8" class="buildRoadButton"/>
+                                                <input type="button" value="hills with river (6 BP)" name="6" class="buildRoadButton ucOnly"/>
+                                                <input type="button" value="other terrain with river (8 BP)" name="8" class="buildRoadButton"/>
+                                            </li>
+                                            <li class="ucOnly">
+                                                Upgrade to Highway:
+                                                <input type="button" value="plains (2 BP)" name="2" class="buildHighwayButton"/>
+                                                <input type="button" value="forest (4 BP)" name="4" class="buildHighwayButton"/>
+                                                <input type="button" value="hills (6 BP)" name="6" class="buildHighwayButton"/>
+                                                <input type="button" value="other terrain (8 BP)" name="8" class="buildHighwayButton"/>
                                             </li>
                                         </ul>
                                     </li>
                                     <li>
-                                        Build farms (limit of <span class="fromKingdom limitFarmlands"></span> per month):
+                                        Build farms<span class="rrrOnly">  (limit of <span class="fromKingdom limitFarmlands"></span> per month)</span>:
                                         <input type="button" value="plains (2 BP)" name="2" class="buildFarmButton"/>
                                         <input type="button" value="hills (4 BP)" name="4" class="buildFarmButton"/>
+                                        <input type="button" value="desert (8 BP)" name="8" class="buildFarmButton ucOnly"/>
+                                    </li>
+                                    <li class="ucOnly">
+                                        Build other improvements:<br/>
+                                        <input type="button" value="Aqueduct in plains (1 BP)" data-json="{&quot;cost&quot;: 1, &quot;Loyalty&quot;: 1, &quot;Stability&quot;: 1}" class="buildTerrainImprovement"/>
+                                        <input type="button" value="Aqueduct in forest (2 BP)" data-json="{&quot;cost&quot;: 2, &quot;Loyalty&quot;: 1, &quot;Stability&quot;: 1}" class="buildTerrainImprovement"/>
+                                        <input type="button" value="Aqueduct in hills (3 BP)" data-json="{&quot;cost&quot;: 3, &quot;Loyalty&quot;: 1, &quot;Stability&quot;: 1}" class="buildTerrainImprovement"/>
+                                        <input type="button" value="Aqueduct in other terrain (4 BP)" data-json="{&quot;cost&quot;: 4, &quot;Loyalty&quot;: 1, &quot;Stability&quot;: 1}" class="buildTerrainImprovement"/><br/>
+                                        <input type="button" value="Canal in plains (2 BP)" data-json="{&quot;cost&quot;: 2}" class="buildTerrainImprovement"/>
+                                        <input type="button" value="Canal in forest (4 BP)" data-json="{&quot;cost&quot;: 4}" class="buildTerrainImprovement"/>
+                                        <input type="button" value="Canal in hills (6 BP)" data-json="{&quot;cost&quot;: 6}" class="buildTerrainImprovement"/>
+                                        <input type="button" value="Canal in other terrain (8 BP)" data-json="{&quot;cost&quot;: 8}" class="buildTerrainImprovement"/><br/>
+                                        <input type="button" value="Fishery (4 BP)" data-json="{&quot;cost&quot;: 4, &quot;Consumption&quot;: -1}" class="buildTerrainImprovement"/>
+                                        <input type="button" value="Fort (24 BP)" data-json="{&quot;cost&quot;: 24, &quot;Stability&quot;: 1, &quot;Unrest&quot;: -1, &quot;Consumption&quot;: 1}" class="buildTerrainImprovement"/>
+                                        <input type="button" value="Mine (6 BP)" data-json="{&quot;cost&quot;: 6, &quot;Economy&quot;: 1, &quot;IncomeBP&quot;: 1}" class="buildTerrainImprovement"/>
+                                        <input type="button" value="Quarry (6 BP)" data-json="{&quot;cost&quot;: 6, &quot;Stability&quot;: 1, &quot;IncomeBP&quot;: 1}" class="buildTerrainImprovement"/>
+                                        <input type="button" value="Sawmill (3 BP)" data-json="{&quot;cost&quot;: 3, &quot;Stability&quot;: 1, &quot;IncomeBP&quot;: 1}" class="buildTerrainImprovement"/>
+                                        <input type="button" value="Watchtower (12 BP)" data-json="{&quot;cost&quot;: 12, &quot;Stability&quot;: 1, &quot;Unrest&quot;: -1}" class="buildTerrainImprovement"/>
                                     </li>
                                 </ul>
                                 <div id="improveHexOutput" class="output"></div>
                             </li>
                             <li><span>Establish and Improve Cities <span class="expando">[-]</span></span>
+                                <p>Let the computer automatically build improvements in your cities:</p>
                                 <div class="indent">
-                                    Improvements for every district (comma-separated list of building names): <input type="text" name="improveCitiesBuildings" size="60"/><br/>
+                                    List improvements you want in every district (comma-separated list of building names): <input type="text" name="improveCitiesBuildings" size="60"/><br/>
                                     Keep treasury above: <input type="text" name="improveCitiesTreasuryLimit" size="4"/> BPs<br/>
                                     Keep Loyalty and Stability ahead of Command DC by: <input type="text" name="improveCitiesMargin" size="4"/><br/>
-                                    Remaining builds this month: <span class="fromKingdom limitBuildingsCurrent"></span> <span class="fromKingdom extraHouse"></span><br/>
-                                    <input type="button" value="Improve cities" id="improveCitiesButton"/>
+                                    Remaining builds available this month: <span class="fromKingdom limitBuildingsCurrent"></span> <span class="fromKingdom extraHouse"></span><br/>
+                                    <input type="button" value="Auto-improve cities" id="improveCitiesButton"/>
                                     <div id="improveCitiesOutput" class="output"></div>
                                 </div>
                             </li>
+                            <li>Recruit/improve armies</li>
                             <li>Edicts</li>
                         </ol>
                     </li>
                     <li>Income Phase
                         <ol type="a">
-                            <li>Deposits</li>
+                            <li class="rrrOnly">Deposits</li>
                             <li>Withdrawals</li>
-                            <li>Sell Valuable Items
-                                <input type="button" value="Empty item slots with cheap items" id="emptyItemSlots"/>
-                                <input type="button" value="Sell most valuable magic items" id="sellItemSlots"/>
+                            <li class="ucOnly">Deposits</li>
+                            <li class="laboriousItemSlots">Sell Valuable Items
+                                <input type="button" class="rrrOnly" value="Empty item slots with cheap items" id="emptyItemSlots"/>
+                                <input type="button" class="rrrOnly" value="Sell most valuable magic items" id="sellItemSlots"/>
                                 <div id="valuableItemOutput" class="output"></div>
                             </li>
                             <li><input type="button" value="Generate Income" id="generateIncomeButton"/>
