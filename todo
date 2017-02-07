@@ -1,19 +1,15 @@
 
-* option to demolish city wall
+* Academy upgrade to University says "not enough room" when there is
 
-* waterway treat as water border
+* canDemolish should do checks as to whether removing that building would break adjacency restrictions for its neighbours
+
+* Not adjacency restriction needs to apply to all of a large building (currently just enforces "base" lot).  Should also restrict rotations of 2x1 building.
+
+* UC only: Leadership feat bonus to realm leader bonus
 
 * Rename/modify list of ruler roles based on ruleset
 
 * thrown melee weapons which can have both types of enhancements
-
-Generalise not adjacent to to take a list of buildings
-
-UC: Settlement base value starts at 0, not 200
-
-Generalise "adjacent to" to take list of buildings?  UC has variations that do/don't include Mansions and Villas.  Might make it hard to score...
-
-Hard to score positive "houseness" in UC with it not being something intrinsic to the building, but instead being referred to by other buildings.
 
 Need to handle lots containing multiple buildings
 
@@ -21,11 +17,7 @@ Need to handle "parameterised" lots, that can contain (e.g.) a skill getting a l
 
 Prompt for parameter on constructing buildings that need them
 
-Houses etc. can only fulfill one adjacency demand each
-
-Houses etc. are adjacent across streets, as well as within blocks
-
-Due to the above, I'm thinking of changing the coordinate system of lots within a settlement to simply be raster-scan style.  Need to handle old format when loading - if lots contained an object rather than a single building name, then can convert if after loading they contain strings.
+* UC: Houses (specifically) can only fulfill one adjacency demand each
 
 UCam discounts only work once, for one of the listed buildings.
 
@@ -36,6 +28,8 @@ House rule: city walls are per-district and defend on all sides
 House rule interface to edit/add custom buildings.
 
 Alert when loading unknown buildings/leadership roles, prompting for substitution.  Initialise with Acadamy -> Academy and Marshall -> Marshal
+
+---------------
 
 Adjacency across streets while keeping existing coordinate system
 
@@ -57,35 +51,3 @@ ne: -7
 sw: +7
 se: +13
 
-function matchBuilding(index, buildingList, actuallyCheck) {
-    if (actuallyCheck) {
-        if (building at index in buildingList)
-            return 1;
-    }
-    return 0;
-}
-
-function countAdjacent(index, buildings) {
-    var square = parseInt(index / 4);
-    var isTop = (square < 3);
-    var isBottom = (square >= 6);
-    var isLeft = (square % 3) == 0;
-    var isRight = (square % 3) == 2;
-    var baseIndex = index & ~3;
-    var position = (index & 3);
-
-    var count = matchBuilding(baseIndex, buildings, baseIndex != index);
-    count += matchBuilding(baseIndex + 1, buildings, baseIndex + 1 != index);
-    count += matchBuilding(baseIndex + 2, buildings, baseIndex + 2 != index);
-    count += matchBuilding(baseIndex + 3, buildings, baseIndex + 3 != index);
-    count += matchBuilding(index - 10, buildings, position < 2 && !isTop);
-    count += matchBuilding(index + 10, buildings, position > 1 && !isBottom);
-    count += matchBuilding(index - 3, buildings, (position&1) == 0 && !isLeft);
-    count += matchBuilding(index + 3, buildings, (position&1) == 1 && !isRight);
-    count += matchBuilding(index - 13, buildings, position == 0 && !isLeft && !isTop);
-    count += matchBuilding(index - 7, buildings, position == 1 && !isRight && !isTop);
-    count += matchBuilding(index + 7, buildings, position == 2 && !isLeft && !isBottom);
-    count += matchBuilding(index + 13, buildings, position == 3 && !isRight && !isBottom);
-
-    return count;
-}

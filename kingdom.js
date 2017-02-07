@@ -69,12 +69,13 @@ Number.prototype.roll = function (dc) {
     }
 }
 
-Array.prototype.joinAnd = function () {
+Array.prototype.joinAnd = function (conjunction) {
     if (this.length <= 1)
         return this.join("");
     else {
         var lastIndex = this.length - 1;
-        return this.slice(0, lastIndex).join(", ") + " and " + this[lastIndex];
+        conjunction = (conjunction) ? ' ' + conjunction + ' ' : ' and ';
+        return this.slice(0, lastIndex).join(", ") + conjunction + this[lastIndex];
     }
 };
 
@@ -1938,8 +1939,8 @@ $.kingdom.Building = Class.create({
         'Cistern': {
             'size': '1x1',
             'cost': 6,
-            'Stability': 1
-            // TODO may not be adjacent to a Dump, Graveyard, Stable, Stockyard or Tannery
+            'Stability': 1,
+            'notAdjacent': [ 'Dump', 'Graveyard', 'Stable', 'Stockyard', 'Tannery' ]
             // TODO can share a lot with another building :(
         },
         'City Wall': {
@@ -1973,7 +1974,7 @@ $.kingdom.Building = Class.create({
             'size': '1x1',
             'cost': 4,
             'Stability': 1,
-            'noAdjacentHouses': true // includes Mansions and Noble Villas
+            'noAdjacentHouses': true
         },
         'Everflowing Spring': {
             'cost': 5
@@ -2007,9 +2008,9 @@ $.kingdom.Building = Class.create({
             'IncomeBP': 1,
             'Unrest': 1,
             'halveCost': ["Blacksmith"],
-            'adjacentWater': true,
+            'adjacent': 'water',
             'productivity': 1
-            // TODO increase the Economy and BP-per-turn from a connected mine :(
+            // TODO increase the Economy and BP-per-turn from a connected mine.  Can by done manually using Other Resources
         },
         'Garrison': {
             'size': '2x1',
@@ -2137,6 +2138,7 @@ $.kingdom.Building = Class.create({
         'Mansion': {
             'size': '1x1',
             'cost': 10,
+            'isHouse': true,
             'Stability': 1,
             'upgradeTo': 'Noble Villa',
             'law': 1,
@@ -2176,7 +2178,7 @@ $.kingdom.Building = Class.create({
         'Mill': {
             'size': '1x1',
             'cost': 6,
-            'adjacentWater': true,
+            'adjacent': 'water',
             'Economy': 1,
             'Stability': 1,
             'productivity': 1
@@ -2223,6 +2225,7 @@ $.kingdom.Building = Class.create({
         'Noble Villa': {
             'size': '2x1',
             'cost': 24,
+            'isHouse': true,
             'halveCost': ["Exotic Artisan", "Luxury Store", "Mansion"],
             'Economy': 1,
             'Loyalty': 1,
@@ -2271,7 +2274,7 @@ $.kingdom.Building = Class.create({
         'Pier': {
             'size': '1x1',
             'cost': 16,
-            'adjacentWater': true,
+            'adjacent': 'water',
             'cityValue': 1000,
             'upgradeTo': 'Waterfront',
             'Economy': 1,
@@ -2290,7 +2293,7 @@ $.kingdom.Building = Class.create({
         'Shop': {
             'size': '1x1',
             'cost': 8,
-            'adjacentHouses': 1, // TODO also Mansion
+            'adjacentHouses': 1,
             'cityValue': 500,
             'upgradeTo': ["Luxury Store", "Market"],
             'Economy': 1,
@@ -2326,7 +2329,7 @@ $.kingdom.Building = Class.create({
             'Stability': -1,
             'halveCost': ["Stable", "Tannery"],
             'productivity': 1
-            // TODO Farms in this or adjacent hexes reduce Consumption by 3 instead of 2
+            // TODO Farms in this or adjacent hexes reduce Consumption by 3 instead of 2.  Can be done manually using Other Resources.
         },
         'Tannery': {
             'size': '1x1',
@@ -2413,6 +2416,7 @@ $.kingdom.Building = Class.create({
             'borderColour': '#7777ff',
             'borderZ': 2,
             'onlyEmpty': true,
+            'water': true,
             'cost': 0
         },
         'Waterfront': {
@@ -2420,7 +2424,7 @@ $.kingdom.Building = Class.create({
             'cost': 90,
             'Economy': 4,
             'halveCost': ["Black Market", "Guildhall", "Market", "Pier"],
-            'adjacentWater': true,
+            'adjacent': 'water',
             'onePerCity': true,
             'cityValue': 4000,
             'halveKingdom': 'Taxation',
@@ -2431,14 +2435,14 @@ $.kingdom.Building = Class.create({
         },
         'Waterway 1x1': {
             'size': '1x1',
-            'cost': 3
-            // TODO counts as a water border for adjacent houses
+            'cost': 3,
+            'water': true
             // TODO there are several waterway images in UC
         },
         'Waterway 2x1': {
             'size': '2x1',
-            'cost': 3
-            // TODO counts as a water border for adjacent houses
+            'cost': 3,
+            'water': true
             // TODO there are several waterway images in UC
         }
     },
@@ -2659,7 +2663,7 @@ $.kingdom.Building = Class.create({
         'Mill': {
             'size': '1x1',
             'cost': 6,
-            'adjacentWater': true,
+            'adjacent': 'water',
             'Economy': 1,
             'Stability': 1
         },
@@ -2686,7 +2690,7 @@ $.kingdom.Building = Class.create({
         'Pier': {
             'size': '1x1',
             'cost': 16,
-            'adjacentWater': true,
+            'adjacent': 'water',
             'cityValue': 1000,
             'Economy': 1,
             'Stability': 1
@@ -2785,12 +2789,13 @@ $.kingdom.Building = Class.create({
             'borderColour': '#7777ff',
             'borderZ': 2,
             'onlyEmpty': true,
+            'water': true,
             'cost': 0
         },
         'Waterfront': {
             'size': '2x2',
             'cost': 90,
-            'adjacentWater': true,
+            'adjacent': 'water',
             'cityValue': 4000,
             'minorItems': 3,
             'mediumItems': 2,
@@ -2822,10 +2827,12 @@ $.kingdom.Building = Class.create({
             result += "\nOnly one per city.";
         if (this.getAdjacentHouses())
             result += "\nMust be adjacent to at least " + this.getAdjacentHouses() + " house" + ((this.getAdjacentHouses() > 1) ? "s." : ".");
-        if (this.getAdjacentWater())
-            result += "\nMust be adjacent to water.";
+        if (this.getAdjacent())
+            result += "\nMust be adjacent to " + ($.isArray(this.getAdjacent()) ? this.getAdjacent().joinAnd('or') : this.getAdjacent());
+        if (this.getNotAdjacent())
+            result += "\nMay not be adjacent to " + ($.isArray(this.getNotAdjacent()) ? this.getNotAdjacent().joinAnd('or') : this.getNotAdjacent());
         if (this.getNoAdjacentHouses())
-            result += "\nMust not be adjacent to any houses.";
+            result += "\nMay not be adjacent to any houses.";
         if (this.getHalveCost())
             result += "\nHalves the cost of " + this.getHalveCost().joinAnd() + " in this city.";
         if (this.getCityValue())
@@ -3046,8 +3053,12 @@ $.kingdom.Building = Class.create({
         return $.kingdom.Building.buildingData[this.name].isHouse;
     },
 
-    getAdjacentWater: function () {
-        return $.kingdom.Building.buildingData[this.name].adjacentWater;
+    getAdjacent: function () {
+        return $.kingdom.Building.buildingData[this.name].adjacent;
+    },
+
+    getNotAdjacent: function () {
+        return $.kingdom.Building.buildingData[this.name].notAdjacent;
     },
 
     getNoAdjacentHouses: function () {
@@ -3344,61 +3355,168 @@ $.kingdom.District = Class.create({
                 + (this.buildings[baseIndex + 3] ? 1 : 0);
     },
 
-    houseCount: function (building) {
-        return (building && building.getIsHouse()) ? 1 : 0;
+    // Test if the building at index matches the criteria, which is either a list of building names or a single
+    // building flag.  If the building at index matches, return true; for a "continue" building whose base building
+    // matches, instead return the index of the base building.  Otherwise, return false;
+    matchBuilding: function (index, criteria) {
+        if (index >= this.sideToIndex('top') && !this.buildings[index]) {
+            // the border data may be in the adjacent district.
+            var side = this.indexToSide(index);
+            var neighbour = this.districtTo(side);
+            var oppositeIndex = this.sideToIndex(this.oppositeSide(side));
+            // Avoid infinite recursion by testing building exists on other side before calling
+            if (neighbour.buildings[oppositeIndex]) {
+                return neighbour.matchBuilding(oppositeIndex, criteria);
+            } else {
+                return false;
+            }
+        }
+        var foundResult = true;
+        if (this.buildings[index]) {
+            if (this.buildings[index] == this.bigBuilding) {
+                if ((index&3) == 3) {
+                    if (this.buildings[index - 1] && this.buildings[index - 1].getSize() == '2x1') {
+                        index -= 1;
+                    } else if (this.buildings[index - 2] && this.buildings[index - 2].getSize() == '2x1') {
+                        index -= 2;
+                    } else {
+                        index -= 3;
+                    }
+                } else {
+                    index = (index & ~3);
+                }
+                foundResult = index;
+            }
+            if (($.isArray(criteria) && $.inArray(this.buildings[index].name, criteria) > -1)
+                    || this.buildings[index].getData()[criteria]) {
+                return foundResult;
+            }
+        }
+        return false;
+    },
+
+    // Count the number of buildings adjacent to the given index which match the criteria
+    countAdjacent: function (index, criteria) {
+        var square = parseInt(index / 4);
+        var isTop = (square < 3);
+        var isBottom = (square >= 6);
+        var isLeft = (square % 3) == 0;
+        var isRight = (square % 3) == 2;
+        var baseIndex = index & ~3;
+        var position = (index & 3);
+        // This coordinate system is rather awkward for working out adjacency.
+        var neighbours = [];
+        switch (position) {
+            case 0:
+                neighbours.push(index + 1);
+                neighbours.push(index + 3);
+                neighbours.push(index + 2);
+                if (!isLeft) {
+                    neighbours.push(index - 1);
+                    neighbours.push(index - 3);
+                    if (!isTop) {
+                        neighbours.push(index - 13);
+                    }
+                } else {
+                    neighbours.push(this.sideToIndex('left'));
+                }
+                if (!isTop) {
+                    neighbours.push(index - 10);
+                    neighbours.push(index - 9);
+                } else {
+                    neighbours.push(this.sideToIndex('top'));
+                }
+                break;
+            case 1:
+                neighbours.push(index + 2);
+                neighbours.push(index + 1);
+                neighbours.push(index - 1);
+                if (!isTop) {
+                    neighbours.push(index - 11);
+                    neighbours.push(index - 10);
+                    if (!isRight) {
+                        neighbours.push(index - 7);
+                    }
+                } else {
+                    neighbours.push(this.sideToIndex('top'));
+                }
+                if (!isRight) {
+                    neighbours.push(index + 3);
+                    neighbours.push(index + 5);
+                } else {
+                    neighbours.push(this.sideToIndex('right'));
+                }
+                break;
+            case 2:
+                neighbours.push(index - 2);
+                neighbours.push(index - 1);
+                neighbours.push(index + 1);
+                if (!isBottom) {
+                    neighbours.push(index + 11);
+                    neighbours.push(index + 10);
+                    if (!isLeft) {
+                        neighbours.push(index + 7);
+                    }
+                } else {
+                    neighbours.push(this.sideToIndex('bottom'));
+                }
+                if (!isLeft) {
+                    neighbours.push(index - 3);
+                    neighbours.push(index - 5);
+                } else {
+                    neighbours.push(this.sideToIndex('left'));
+                }
+                break;
+            case 3:
+                neighbours.push(index - 1);
+                neighbours.push(index - 3);
+                neighbours.push(index - 2);
+                if (!isRight) {
+                    neighbours.push(index + 1);
+                    neighbours.push(index + 3);
+                    if (!isBottom) {
+                        neighbours.push(index + 13);
+                    }
+                } else {
+                    neighbours.push(this.sideToIndex('right'));
+                }
+                if (!isBottom) {
+                    neighbours.push(index + 10);
+                    neighbours.push(index + 9);
+                } else {
+                    neighbours.push(this.sideToIndex('bottom'));
+                }
+                break;
+        }
+        var count = 0;
+        for (var pos = 0; pos < neighbours.length; ++pos) {
+            var result = this.matchBuilding(neighbours[pos], criteria);
+            if ($.isNumeric(result)) {
+                // Matching building was large - count it unless we're also going to check the "base index" of the large building.
+                if ($.inArray(result, neighbours) == -1) {
+                    count++;
+                }
+            } else if (result) {
+                count++;
+            }
+        }
+        return count;
     },
 
     countAdjacentHouses: function (index) {
-        var baseIndex = index & ~3;
-        var houses = 0;
-        houses += this.houseCount(this.buildings[baseIndex]);
-        houses += this.houseCount(this.buildings[baseIndex + 1]);
-        houses += this.houseCount(this.buildings[baseIndex + 2]);
-        houses += this.houseCount(this.buildings[baseIndex + 3]);
-        return houses;
-    },
-
-    getMinimumHouses: function (minimum, building) {
-        if (building && building.getAdjacentHouses() && building.getAdjacentHouses() > minimum)
-            minimum = building.getAdjacentHouses();
-        return minimum;
-    },
-
-    getMinimumHousesForSquare: function (index) {
-        var baseIndex = index & ~3;
-        var minimum = this.getMinimumHouses(0, this.buildings[baseIndex]);
-        minimum = this.getMinimumHouses(minimum, this.buildings[baseIndex + 1]);
-        minimum = this.getMinimumHouses(minimum, this.buildings[baseIndex + 2]);
-        minimum = this.getMinimumHouses(minimum, this.buildings[baseIndex + 3]);
-        return minimum;
-    },
-
-    noAdjacentHousesBuildingName: function (index) {
-        var building = this.buildings[index];
-        return (building && building.getNoAdjacentHouses()) ? building.name : null;
+        return this.countAdjacent(index, 'isHouse');
     },
 
     noHousesAllowedCheck: function (index) {
-        var baseIndex = index & ~3;
-        return (this.noAdjacentHousesBuildingName(baseIndex) ||
-            this.noAdjacentHousesBuildingName(baseIndex + 1) ||
-            this.noAdjacentHousesBuildingName(baseIndex + 2) ||
-            this.noAdjacentHousesBuildingName(baseIndex + 3));
+        return this.countAdjacent(index, 'noAdjacentHouses') > 0;
     },
 
     canDemolish: function (index) {
-        var building = this.buildings[index];
-        if (building && building.getIsHouse()) {
-            var houses = this.countAdjacentHouses(index);
-            var minimumHouses = this.getMinimumHousesForSquare(index);
-            if (houses - 1 < minimumHouses)
-                return false;
-        }
         return true;
     },
 
     get2x1ContinueIndex: function (index) {
-        if ((index & 3) == 2 || this.buildings[index + 1] == this.bigBuilding)
+        if ((index & 3) != 1 && this.buildings[index + 1] == this.bigBuilding)
             return index + 1;
         else
             return index + 2;
@@ -3461,37 +3579,6 @@ $.kingdom.District = Class.create({
         return true;
     },
 
-    isWaterBorder: function (side) {
-        var borderIndex = this.sideToIndex(side);
-        var border = this.buildings[borderIndex];
-        if (border)
-            return (border.name == 'Water');
-        else {
-            var neighbour = this.districtTo(side);
-            return neighbour.isWaterBorder(this.oppositeSide(side));
-        }
-    },
-
-    isAdjacentToWater: function (index, building) {
-        var square = parseInt(index / 4);
-        var isTop = (square < 3);
-        var isBottom = (square >= 6);
-        var isLeft = (square % 3) == 0;
-        var isRight = (square % 3) == 2;
-        var building = building || this.buildings[index];
-        if (building && building.getSize() != '2x2') {
-            var corner = index & 3;
-            isTop &= (corner < 2);
-            isBottom &= (corner >= 2);
-            isLeft &= (corner % 2) == 0;
-            isRight &= (corner % 2) == 1;
-        }
-        return ((isTop && this.isWaterBorder('top')) ||
-            (isBottom && this.isWaterBorder('bottom')) ||
-            (isLeft && this.isWaterBorder('left')) ||
-            (isRight && this.isWaterBorder('right')));
-    },
-
     buildingCost: function (building) {
         if ($('#freeBuildCheckbox').prop('checked')) {
             return 0;
@@ -3549,14 +3636,16 @@ $.kingdom.District = Class.create({
         var problem;
         if (building.getOnePerCity() && this.city.onlyOne[building.name])
             problem = "already one in this city";
-        else if (building.getAdjacentWater() && !this.isAdjacentToWater(index, building))
-            problem = "not adjacent to water";
+        else if (building.getAdjacent() && this.countAdjacent(index, building.getAdjacent()) == 0)
+            problem = "not adjacent to " + ($.isArray(building.getAdjacent()) ? building.getAdjacent().joinAnd('or') : building.getAdjacent());
+        else if (building.getNotAdjacent() && this.countAdjacent(index, building.getNotAdjacent()) > 0)
+            problem = "adjacent to " + ($.isArray(building.getNotAdjacent()) ? building.getNotAdjacent().joinAnd('or') : building.getNotAdjacent());
         else if (building.getAdjacentHouses() && this.countAdjacentHouses(index) < building.getAdjacentHouses())
             problem = "not adjacent to at least " + building.getAdjacentHouses() + " house" + ((building.getAdjacentHouses() > 1) ? "s" : "");
         else if (building.getNoAdjacentHouses() && this.countAdjacentHouses(index) > 0)
             problem = "adjacent to houses";
         else if (building.getIsHouse() && this.noHousesAllowedCheck(index))
-            problem = "no houses allowed adjacent to " + this.noHousesAllowedCheck(index);
+            problem = "existing building forbids adjacent houses";
         else if (!this.isEnoughRoom(building, index)) {
             if (building.getSize() == "2x1") {
                 problem = "not enough room - occupies 2 lots";
@@ -3667,12 +3756,13 @@ $.kingdom.District = Class.create({
                 continue;
             }
             var end = (building.getSize() == 'border') ? borderStart + 4 : borderStart;
-            var byWater = -1, newLot = -1, bestLot = -1;
+            var newLot = -1, bestLot = -1;
             var additionalHouses = {}, reservoirHits = {};
             for (var lot = (building.getSize() == 'border') ? borderStart : 0; lot < end; ++lot) {
                 if ((lot < borderStart && !this.isEnoughRoom(building, lot)) ||
                         (lot >= borderStart && this.buildings[lot] !== landBorder) ||
-                        (building.getAdjacentWater() && !this.isAdjacentToWater(lot, building))) {
+                        (building.getAdjacent() && this.countAdjacent(lot, building.getAdjacent()) == 0) ||
+                        (building.getNotAdjacent() && this.countAdjacent(lot, building.getNotAdjacent()) > 0)) {
                     continue;
                 }
                 var occupiedLots = this.countOccupiedLots(lot);
@@ -3692,15 +3782,13 @@ $.kingdom.District = Class.create({
                 } else if (adjacentHouses > 0) {
                     continue;
                 }
-                if (lot < borderStart && this.isAdjacentToWater(lot, building) && !building.getAdjacentWater()) {
-                    byWater = this.lotWithFewestAdditionalHouses(byWater, lot, additionalHouses, reservoirHits);
-                } else if (lot < borderStart && occupiedLots == 0) {
+                if (lot < borderStart && occupiedLots == 0) {
                     newLot = this.lotWithFewestAdditionalHouses(newLot, lot, additionalHouses, reservoirHits);
                 } else {
                     bestLot = this.lotWithFewestAdditionalHouses(bestLot, lot, additionalHouses, reservoirHits);
                 }
             }
-            var lot = (bestLot >= 0) ? bestLot : ((newLot >= 0) ? newLot : byWater);
+            var lot = (bestLot >= 0) ? bestLot : newLot;
             if (lot >= 0) {
                 var score = this.scoreAutomatedBuild(building, lot, additionalHouses[lot], goal);
                 if (score > 0) {
@@ -3789,15 +3877,9 @@ $.kingdom.District = Class.create({
             score /= kingdomUnrest + buildingUnrest;
         }
         // Location within the district
-        if (lot < this.sideToIndex('top')) {
-            if (this.isAdjacentToWater(lot, building) && !building.getAdjacentWater()) {
-                // Score is lower if building uses a lot adjacent to water that it doesn't need.
-                score /= 2;
-            }
-            if (this.countOccupiedLots(lot) == 0) {
-                // Score is lower if the building is starting to fill a new block.
-                score /= 2;
-            }
+        if (lot < this.sideToIndex('top') && this.countOccupiedLots(lot) == 0) {
+            // Score is lower if the building is starting to fill a new block.
+            score /= 2;
         }
         // Score is lower if the building requires additional houses be built.
         score *= 4 / (4 + additionalHouses);
