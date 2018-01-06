@@ -6083,7 +6083,7 @@ $.kingdom.Calendar = Class.create({
         this.month--;
         if (this.month < 0) {
             this.year--;
-            this.month = this.monthNames.length;
+            this.month = this.monthNames.length - 1;
         }
         this.save();
         this.refresh();
